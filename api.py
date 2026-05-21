@@ -60,6 +60,12 @@ class APIClient:
                 return response.json()
         return None
 
+    def get_world_saves(self, world_id):
+        response = self.session.get(f"{BASE_URL}/worlds/{world_id}/saves")
+        if response.status_code == 200:
+            return response.json()
+        return []
+
     def get_version(self):
         response = requests.get(f"{BASE_URL}/client/version")
         if response.status_code == 200:

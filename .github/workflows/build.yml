@@ -24,6 +24,13 @@ jobs:
         pip install -r requirements.txt
         pip install "flet[all]" pyinstaller
 
+    - name: Bump version in main.py
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        $tag = "${{ github.ref_name }}" -replace '^v', ''
+        (Get-Content main.py) -replace 'VERSION = ".*"', "VERSION = `"$tag`"" | Set-Content main.py
+        Write-Host "Version set to $tag"
+
     - name: Build with flet pack
       run: |
         flet pack main.py --name SFT-Tracker-Setup

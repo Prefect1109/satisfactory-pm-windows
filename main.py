@@ -4,6 +4,7 @@ import sys
 import threading
 import time
 import pathlib
+import webbrowser
 from api import APIClient
 from utils import get_save_games_path, get_latest_local_save, get_file_hash, get_session_name
 
@@ -61,7 +62,7 @@ class SFTApp:
                     return
 
                 def close_app(e):
-                    self.page.launch_url(download_url)
+                    webbrowser.open(download_url)
                     self.page.window_close()
 
                 self.page.dialog = ft.AlertDialog(
@@ -130,7 +131,7 @@ class SFTApp:
                         icon=ft.Icons.TELEGRAM,
                         color=ft.Colors.WHITE,
                         bgcolor=ft.Colors.BLUE_600,
-                        on_click=lambda _: self.page.launch_url("https://t.me/SatisfactoryTrackerBot")
+                        on_click=lambda _: webbrowser.open("https://t.me/SatisfactoryTrackerBot")
                     ),
                     ft.Text("Use /connect in the bot to get your token", color=ft.Colors.GREY_500, size=12),
                     ft.Divider(height=20, color=ft.Colors.TRANSPARENT),

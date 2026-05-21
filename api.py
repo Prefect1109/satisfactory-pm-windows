@@ -14,7 +14,7 @@ class APIClient:
         response = self.session.post(f"{BASE_URL}/auth/exchange", json={"token": connect_token})
         if response.status_code == 200:
             data = response.json()
-            self.token = data["access_token"]
+            self.token = data["token"]
             self.session.headers.update({"Authorization": f"Bearer {self.token}"})
             return True
         return False

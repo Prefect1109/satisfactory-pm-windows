@@ -12,28 +12,34 @@ jobs:
       contents: write
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-        
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install flet[all] pyinstaller
+        pip install "flet[all]" pyinstaller
 
     - name: Build with flet pack
       run: |
-        flet pack main.py --name main
-        
-    - name: Install Inno Setup
-      run: choco install innosetup --yes
+        flet pack main.py --name SFT-Tracker-Setup
 
-    - name: Build Installer (Inno Setup)
-      run: iscc setup.iss
-        
+    - name: Show dist structure
+      run: Get-ChildItem -Path dist -Recurse | Select-Object FullName
+
+    - name: Find and copy exe
+      run: |
+        $exe = Get-ChildItem -Path dist -Recurse -Filter "SFT-Tracker-Setup.exe" | Select-Object -First 1
+        if (-not $exe) {
+          $exe = Get-ChildItem -Path dist -Recurse -Filter "*.exe" | Select-Object -First 1
+        }
+        Write-Host "Found: $($exe.FullName)"
+        Copy-Item $exe.FullName -Destination "dist\SFT-Tracker-Setup.exe" -Force
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -51,7 +57,7 @@ jobs:
     - name: Notify Backend
       if: startsWith(github.ref, 'refs/tags/')
       run: |
-        curl -X POST https://satisfactory.kaffka.tech/api/admin/client/version \
-          -H "Content-Type: application/json" \
-          -H "x-admin-token: ${{ secrets.ADMIN_TOKEN }}" \
+        curl -X POST https://satisfactory.kaffka.tech/api/admin/client/version `
+          -H "Content-Type: application/json" `
+          -H "x-admin-token: ${{ secrets.ADMIN_TOKEN }}" `
           -d "{\"version\": \"${{ github.ref_name }}\", \"url\": \"https://github.com/Prefect1109/satisfactory-pm-windows/releases/download/${{ github.ref_name }}/SFT-Tracker-Setup.exe\", \"force_update\": false}"

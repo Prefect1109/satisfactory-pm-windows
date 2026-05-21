@@ -131,7 +131,7 @@ class SFTApp:
                         icon=ft.Icons.TELEGRAM,
                         color=ft.Colors.WHITE,
                         bgcolor=ft.Colors.BLUE_600,
-                        on_click=lambda _: webbrowser.open("https://t.me/SatisfactoryTrackerBot")
+                        on_click=lambda _: webbrowser.open("https://t.me/satisfactory_pm_bot")
                     ),
                     ft.Text("Use /connect in the bot to get your token", color=ft.Colors.GREY_500, size=12),
                     ft.Divider(height=20, color=ft.Colors.TRANSPARENT),

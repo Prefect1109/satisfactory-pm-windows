@@ -3,8 +3,33 @@ import os
 import sys
 import threading
 import time
+import pathlib
 from api import APIClient
 from utils import get_save_games_path, get_latest_local_save, get_file_hash, get_session_name
+
+def _token_path():
+    appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+    p = pathlib.Path(appdata) / 'SFTracker'
+    p.mkdir(parents=True, exist_ok=True)
+    return p / 'token.txt'
+
+def _load_token():
+    try:
+        return _token_path().read_text().strip() or None
+    except Exception:
+        return None
+
+def _save_token(token):
+    try:
+        _token_path().write_text(token)
+    except Exception:
+        pass
+
+def _clear_token():
+    try:
+        _token_path().unlink(missing_ok=True)
+    except Exception:
+        pass
 
 VERSION = "1.1.0"
 
@@ -61,7 +86,7 @@ class SFTApp:
 
         self.check_for_updates()
 
-        saved_token = self.page.client_storage.get("auth_token")
+        saved_token = _load_token()
         if saved_token:
             self.api.token = saved_token
             self.api.session.headers.update({"Authorization": f"Bearer {saved_token}"})
@@ -400,13 +425,13 @@ class SFTApp:
 
     def logout(self, e):
         self.auto_refresh_running = False
-        self.page.client_storage.remove("auth_token")
+        _clear_token()
         self.api.token = None
         self.show_login_view()
 
     def handle_deeplink(self, token):
         if self.api.login(token):
-            self.page.client_storage.set("auth_token", self.api.token)
+            _save_token(self.api.token)
             self.show_main_view()
         else:
             self.page.show_snack_bar(ft.SnackBar(ft.Text("Login failed! Invalid token.", color=ft.Colors.RED_400)))

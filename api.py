@@ -1,7 +1,7 @@
 import requests
 import os
 
-BASE_URL = "https://api.satisfactory.kaffka.tech"
+BASE_URL = "https://satisfactory.kaffka.tech/api"
 
 class APIClient:
     def __init__(self, token=None):

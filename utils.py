@@ -46,3 +46,31 @@ def get_file_hash(filepath):
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+def get_session_name(filepath):
+    import struct
+    try:
+        with open(filepath, "rb") as f:
+            raw = f.read(2048)
+        off = 0
+        _save_hdr_ver = struct.unpack_from("<i", raw, off)[0]; off += 4
+        save_ver = struct.unpack_from("<i", raw, off)[0]; off += 4
+        build_ver = struct.unpack_from("<i", raw, off)[0]; off += 4
+        
+        def _read_fstring(d: bytes, off: int):
+            length, off = struct.unpack_from("<i", d, off)[0], off + 4
+            if length == 0:
+                return "", off
+            if length > 0:
+                s = d[off:off + length - 1].decode("utf-8", errors="replace")
+                return s, off + length
+            byte_len = (-length) * 2
+            s = d[off:off + byte_len - 2].decode("utf-16-le", errors="replace")
+            return s, off + byte_len
+
+        map_name, off = _read_fstring(raw, off)
+        _map_opts, off = _read_fstring(raw, off)
+        session_name, off = _read_fstring(raw, off)
+        return session_name
+    except Exception:
+        return ""

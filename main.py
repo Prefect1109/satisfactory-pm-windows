@@ -2,7 +2,7 @@ import flet as ft
 import os
 import sys
 from api import APIClient
-from utils import get_save_games_path, get_latest_local_save, get_file_hash
+from utils import get_save_games_path, get_latest_local_save, get_file_hash, get_session_name
 
 VERSION = "1.0.0"
 
@@ -246,10 +246,18 @@ class SFTApp:
 
         # Smart Sync: Check if same version already on server
         local_hash = get_file_hash(latest_local)
+        local_session = get_session_name(latest_local)
         meta = self.api.get_save_metadata(self.world_dropdown.value)
+        
         if meta and meta.get("hash") == local_hash:
             self.page.show_snack_bar(ft.SnackBar(ft.Text("This version is already on the server!")))
             return
+
+        server_session = meta.get("session_name") if meta and meta.get("exists") else None
+        warning_msg = None
+        
+        if server_session and local_session and server_session != local_session:
+            warning_msg = f"⚠️ MISMATCH!\nServer: '{server_session}'\nLocal: '{local_session}'\nUpload anyway?"
 
         def do_upload(e):
             self.page.dialog.open = False
@@ -262,8 +270,19 @@ class SFTApp:
                 self.page.show_snack_bar(ft.SnackBar(ft.Text("Upload failed!")))
             self.page.update()
 
-        # Confirm upload if server has a different version
-        if meta and meta.get("exists"):
+        # Confirm upload if server has a different version or session mismatch
+        if warning_msg:
+            self.page.dialog = ft.AlertDialog(
+                title=ft.Text("Cross-World Overwrite Risk", color=ft.colors.RED_400),
+                content=ft.Text(warning_msg),
+                actions=[
+                    ft.TextButton("Yes, Overwrite", on_click=do_upload, icon=ft.icons.WARNING_AMBER_ROUNDED),
+                    ft.TextButton("Cancel", on_click=lambda _: self.set_dialog(False)),
+                ]
+            )
+            self.page.dialog.open = True
+            self.page.update()
+        elif meta and meta.get("exists"):
             self.page.dialog = ft.AlertDialog(
                 title=ft.Text("Confirm Upload"),
                 content=ft.Text("This will replace the latest save on the server. Continue?"),

@@ -24,6 +24,11 @@ class SFTApp:
             download_url = version_info.get("url")
 
             if remote_version != VERSION or force_update:
+                # Validate URL for security
+                if not download_url or not download_url.startswith("https://"):
+                    print("Invalid download URL. Must be HTTPS.")
+                    return
+
                 # Show update dialog
                 def close_app(e):
                     import subprocess
@@ -272,4 +277,6 @@ def main(page: ft.Page):
             app.handle_deeplink(token)
 
 if __name__ == "__main__":
+    ft.app(target=main)
+:
     ft.app(target=main)

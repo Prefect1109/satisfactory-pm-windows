@@ -26,9 +26,11 @@ jobs:
       run: |
         pyinstaller --noconsole --onedir --name main main.py
         
+    - name: Install Inno Setup
+      run: choco install innosetup --yes
+
     - name: Build Installer (Inno Setup)
-      run: |
-        iscc setup.iss
+      run: iscc setup.iss
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
@@ -43,3 +45,11 @@ jobs:
         files: dist/SFT-Tracker-Setup.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Notify Backend
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        curl -X POST https://api.satisfactory.kaffka.tech/admin/client/version \
+          -H "Content-Type: application/json" \
+          -H "x-admin-token: ${{ secrets.ADMIN_TOKEN }}" \
+          -d "{\"version\": \"${{ github.ref_name }}\", \"url\": \"https://github.com/Prefect1109/satisfactory-pm-windows/releases/download/${{ github.ref_name }}/SFT-Tracker-Setup.exe\", \"force_update\": false}"

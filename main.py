@@ -10,7 +10,8 @@ class SFTApp:
     def __init__(self, page: ft.Page):
         self.page = page
         self.api = APIClient()
-        self.save_path = get_save_games_path()
+        self.save_paths = get_save_games_path()
+        self.save_path = self.save_paths[0] if self.save_paths else None
         self.init_ui()
 
     def check_for_updates(self):
@@ -138,15 +139,37 @@ class SFTApp:
                     ),
                 ], alignment=ft.MainAxisAlignment.CENTER),
                 ft.Divider(height=40),
-                ft.Column([
-                    ft.Text("Save Folder Status:", weight=ft.FontWeight.BOLD),
-                    ft.Text(f"Path: {self.save_path or 'Not Found'}", size=11, color=ft.colors.GREY_400),
-                    self.local_save_text
-                ], spacing=5),
+                ft.Column(self._build_save_folder_ui(), spacing=5),
                 ft.Container(expand=True),
                 ft.TextButton("Logout", on_click=self.logout, font_family="monospace")
             ], expand=True)
         )
+        self.page.update()
+
+    def _build_save_folder_ui(self):
+        ui = [ft.Text("Save Folder Status:", weight=ft.FontWeight.BOLD)]
+        
+        if len(self.save_paths) > 1:
+            # Show a dropdown if multiple Steam IDs
+            folder_options = [ft.dropdown.Option(key=p, text=os.path.basename(p)) for p in self.save_paths]
+            self.folder_dropdown = ft.Dropdown(
+                label="Select Account ID",
+                options=folder_options,
+                value=self.save_path,
+                width=300,
+                on_change=self.on_folder_change
+            )
+            ui.append(self.folder_dropdown)
+            ui.append(ft.Text(f"Path: {os.path.dirname(self.save_path)}/...", size=11, color=ft.colors.GREY_400))
+        else:
+            ui.append(ft.Text(f"Path: {self.save_path or 'Not Found'}", size=11, color=ft.colors.GREY_400))
+            
+        ui.append(self.local_save_text)
+        return ui
+
+    def on_folder_change(self, e):
+        self.save_path = self.folder_dropdown.value
+        self.update_local_save_info()
         self.page.update()
 
     def update_local_save_info(self):

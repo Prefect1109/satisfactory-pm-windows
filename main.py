@@ -9,7 +9,7 @@ import datetime
 from api import APIClient
 from utils import get_save_games_path, get_latest_local_save, get_file_hash, get_session_name
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 
 # --- Token Helpers ---
 def _token_path():
@@ -64,8 +64,8 @@ class SFTApp:
         self.page.window_resizable = False
         self.page.window_title_bar_hidden = True
         self.page.window_title_bar_buttons_hidden = True
-        self.page.bgcolor = ft.colors.TRANSPARENT
-        self.page.window_bgcolor = ft.colors.TRANSPARENT
+        self.page.bgcolor = ft.Colors.TRANSPARENT
+        self.page.window_bgcolor = ft.Colors.TRANSPARENT
         self.page.padding = 0
         self.page.spacing = 0
         self.page.theme_mode = ft.ThemeMode.DARK
@@ -89,18 +89,18 @@ class SFTApp:
                 ft.Container(
                     expand=True,
                     gradient=ft.LinearGradient(
-                        begin=ft.alignment.top_left,
-                        end=ft.alignment.bottom_right,
+                        begin=ft.Alignment.top_left,
+                        end=ft.Alignment.bottom_right,
                         colors=["#0f172a", "#1e293b", "#334155"]
                     )
                 ),
                 ft.Container(
                     content=ft.Column([
-                        ft.Icon(ft.Icons.FACTORY_ROUNDED, size=64, color=ft.colors.ORANGE_400),
-                        ft.ProgressRing(width=40, height=40, stroke_width=3, color=ft.colors.ORANGE_500),
-                        ft.Text("INITIALIZING SYSTEM", size=10, letter_spacing=2, weight=ft.FontWeight.W_300, color=ft.colors.BLUE_GREY_300),
+                        ft.Icon(ft.Icons.FACTORY_ROUNDED, size=64, color=ft.Colors.ORANGE_400),
+                        ft.ProgressRing(width=40, height=40, stroke_width=3, color=ft.Colors.ORANGE_500),
+                        ft.Text("INITIALIZING SYSTEM", size=10, letter_spacing=2, weight=ft.FontWeight.W_300, color=ft.Colors.BLUE_GREY_300),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER, spacing=30),
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment.center,
                     expand=True
                 )
             ], expand=True)
@@ -132,16 +132,16 @@ class SFTApp:
             ft.WindowDragHandler(
                 content=ft.Container(
                     content=ft.Row([
-                        ft.Icon(ft.Icons.FACTORY_ROUNDED, size=18, color=ft.colors.ORANGE_500),
-                        ft.Text(title, size=12, weight=ft.FontWeight.BOLD, color=ft.colors.BLUE_GREY_100),
+                        ft.Icon(ft.Icons.FACTORY_ROUNDED, size=18, color=ft.Colors.ORANGE_500),
+                        ft.Text(title, size=12, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_GREY_100),
                     ], spacing=10),
-                    padding=ft.padding.only(left=20),
+                    padding=ft.Padding.only(left=20),
                     expand=True
                 )
             ),
             ft.Row([
-                ft.IconButton(ft.Icons.MINIMIZE_ROUNDED, icon_size=16, icon_color=ft.colors.BLUE_GREY_400, on_click=lambda _: self.page.window_minimize()),
-                ft.IconButton(ft.Icons.CLOSE_ROUNDED, icon_size=16, icon_color=ft.colors.RED_400, on_click=lambda _: self.page.window_close()),
+                ft.IconButton(ft.Icons.MINIMIZE_ROUNDED, icon_size=16, icon_color=ft.Colors.BLUE_GREY_400, on_click=lambda _: self.page.window_minimize()),
+                ft.IconButton(ft.Icons.CLOSE_ROUNDED, icon_size=16, icon_color=ft.Colors.RED_400, on_click=lambda _: self.page.window_close()),
             ], spacing=0)
         ], height=40)
 
@@ -154,7 +154,7 @@ class SFTApp:
             border_radius=15,
             border_color="#44FFFFFF",
             bgcolor="#11FFFFFF",
-            color=ft.colors.WHITE,
+            color=ft.Colors.WHITE,
             text_size=14,
             width=300,
         )
@@ -166,21 +166,21 @@ class SFTApp:
                 _save_token(self.api.token)
                 self._load_initial_data()
             else:
-                self._snack("Invalid token", ft.colors.RED_400)
+                self._snack("Invalid token", ft.Colors.RED_400)
 
         login_card = self._build_glass_container(
             ft.Column([
-                ft.Icon(ft.Icons.TELEGRAM, size=60, color=ft.colors.BLUE_400),
-                ft.Text("LINK ACCOUNT", size=24, weight=ft.FontWeight.BOLD, color=ft.colors.WHITE),
+                ft.Icon(ft.Icons.TELEGRAM, size=60, color=ft.Colors.BLUE_400),
+                ft.Text("LINK ACCOUNT", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
                 ft.Text("Use /connect command in Satisfactory Bot\nto obtain your secret access token.", 
-                        text_align=ft.TextAlign.CENTER, color=ft.colors.BLUE_GREY_200, size=12),
-                ft.Divider(height=20, color=ft.colors.TRANSPARENT),
+                        text_align=ft.TextAlign.CENTER, color=ft.Colors.BLUE_GREY_200, size=12),
+                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
                 token_field,
                 ft.ElevatedButton(
                     "AUTHORIZE",
                     icon=ft.Icons.LOCK_OPEN_ROUNDED,
-                    color=ft.colors.WHITE,
-                    bgcolor=ft.colors.ORANGE_700,
+                    color=ft.Colors.WHITE,
+                    bgcolor=ft.Colors.ORANGE_700,
                     width=300,
                     height=50,
                     on_click=do_login,
@@ -196,7 +196,7 @@ class SFTApp:
                 ft.Container(expand=True, gradient=ft.LinearGradient(colors=["#0f172a", "#1e293b"])),
                 ft.Column([
                     self._build_title_bar("AUTHENTICATION"),
-                    ft.Container(content=login_card, alignment=ft.alignment.center, expand=True)
+                    ft.Container(content=login_card, alignment=ft.Alignment.center, expand=True)
                 ], expand=True)
             ])
         )
@@ -211,7 +211,7 @@ class SFTApp:
             min_width=100,
             min_extended_width=200,
             group_alignment=-0.9,
-            bgcolor=ft.colors.TRANSPARENT,
+            bgcolor=ft.Colors.TRANSPARENT,
             destinations=[
                 ft.NavigationRailDestination(icon=ft.Icons.SYNC_ROUNDED, selected_icon=ft.Icons.SYNC_ROUNDED, label="Sync"),
                 ft.NavigationRailDestination(icon=ft.Icons.SETTINGS_ROUNDED, selected_icon=ft.Icons.SETTINGS_ROUNDED, label="Config"),
@@ -232,28 +232,28 @@ class SFTApp:
 
         self.btn_sync = ft.Container(
             content=ft.Row([
-                ft.Icon(ft.Icons.SYNC_ROUNDED, color=ft.colors.WHITE),
-                ft.Text("SYNC NOW", weight=ft.FontWeight.BOLD, color=ft.colors.WHITE)
+                ft.Icon(ft.Icons.SYNC_ROUNDED, color=ft.Colors.WHITE),
+                ft.Text("SYNC NOW", weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE)
             ], alignment=ft.MainAxisAlignment.CENTER),
             width=200,
             height=55,
             border_radius=20,
-            gradient=ft.LinearGradient(colors=[ft.colors.ORANGE_600, ft.colors.ORANGE_800]),
+            gradient=ft.LinearGradient(colors=[ft.Colors.ORANGE_600, ft.Colors.ORANGE_800]),
             on_click=self.on_sync,
-            animate=ft.animation.Animation(300, ft.AnimationCurve.EASE_OUT),
+            animate=ft.Animation.Animation(300, ft.AnimationCurve.EASE_OUT),
             disabled=True,
             opacity=0.5
         )
 
-        self.sync_msg = ft.Text("Checking state...", color=ft.colors.BLUE_GREY_400, size=12)
+        self.sync_msg = ft.Text("Checking state...", color=ft.Colors.BLUE_GREY_400, size=12)
         self.local_card = self._build_stat_tile("LOCAL", "computer")
         self.server_card = self._build_stat_tile("SERVER", "cloud")
 
         self.dashboard_view = ft.Column([
-            ft.Text("SYSTEM STATUS", size=10, letter_spacing=2, color=ft.colors.BLUE_GREY_400),
-            ft.Divider(height=10, color=ft.colors.TRANSPARENT),
+            ft.Text("SYSTEM STATUS", size=10, letter_spacing=2, color=ft.Colors.BLUE_GREY_400),
+            ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
             self.world_dropdown,
-            ft.Divider(height=20, color=ft.colors.TRANSPARENT),
+            ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
             ft.Row([self.local_card, self.server_card], spacing=15),
             ft.Container(height=40),
             ft.Column([
@@ -264,27 +264,27 @@ class SFTApp:
 
         # Config View
         self.config_view = ft.Column([
-            ft.Text("APPLICATION CONFIG", size=10, letter_spacing=2, color=ft.colors.BLUE_GREY_400),
-            ft.Divider(height=10, color=ft.colors.TRANSPARENT),
+            ft.Text("APPLICATION CONFIG", size=10, letter_spacing=2, color=ft.Colors.BLUE_GREY_400),
+            ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
             ft.ListTile(
-                leading=ft.Icon(ft.Icons.FOLDER_OPEN_ROUNDED, color=ft.colors.BLUE_400),
+                leading=ft.Icon(ft.Icons.FOLDER_OPEN_ROUNDED, color=ft.Colors.BLUE_400),
                 title=ft.Text("Save Folder", size=14),
-                subtitle=ft.Text(self.save_path, size=10, color=ft.colors.BLUE_GREY_400),
+                subtitle=ft.Text(self.save_path, size=10, color=ft.Colors.BLUE_GREY_400),
                 on_click=self.on_open_folder
             ),
             ft.ListTile(
-                leading=ft.Icon(ft.Icons.LOGOUT_ROUNDED, color=ft.colors.RED_400),
-                title=ft.Text("Logout", size=14, color=ft.colors.RED_400),
+                leading=ft.Icon(ft.Icons.LOGOUT_ROUNDED, color=ft.Colors.RED_400),
+                title=ft.Text("Logout", size=14, color=ft.Colors.RED_400),
                 on_click=self.logout
             ),
             ft.Container(expand=True),
-            ft.Text(f"Client v{VERSION}", size=10, color=ft.colors.BLUE_GREY_600)
+            ft.Text(f"Client v{VERSION}", size=10, color=ft.Colors.BLUE_GREY_600)
         ], visible=False)
 
         self.content_area = ft.Container(
             content=self.dashboard_view,
             expand=True,
-            padding=ft.padding.only(top=20, left=20, right=20, bottom=40)
+            padding=ft.Padding.only(top=20, left=20, right=20, bottom=40)
         )
 
         main_panel = self._build_glass_container(
@@ -300,8 +300,8 @@ class SFTApp:
                 ft.Container(
                     expand=True, 
                     gradient=ft.LinearGradient(
-                        begin=ft.alignment.top_left,
-                        end=ft.alignment.bottom_right,
+                        begin=ft.Alignment.top_left,
+                        end=ft.Alignment.bottom_right,
                         colors=["#0f172a", "#111827", "#1e1b4b"]
                     )
                 ),
@@ -319,10 +319,10 @@ class SFTApp:
     def _build_stat_tile(self, label, icon_name):
         return ft.Container(
             content=ft.Column([
-                ft.Row([ft.Icon(getattr(ft.Icons, f"{icon_name.upper()}_ROUNDED"), size=14, color=ft.colors.BLUE_300), 
-                        ft.Text(label, size=9, weight=ft.FontWeight.BOLD, color=ft.colors.BLUE_GREY_300)]),
-                ft.Text("-", size=11, color=ft.colors.WHITE, weight=ft.FontWeight.W_500, key="info"),
-                ft.Text("NO DATA", size=9, color=ft.colors.BLUE_GREY_500, key="session")
+                ft.Row([ft.Icon(getattr(ft.Icons, f"{icon_name.upper()}_ROUNDED"), size=14, color=ft.Colors.BLUE_300), 
+                        ft.Text(label, size=9, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_GREY_300)]),
+                ft.Text("-", size=11, color=ft.Colors.WHITE, weight=ft.FontWeight.W_500, key="info"),
+                ft.Text("NO DATA", size=9, color=ft.Colors.BLUE_GREY_500, key="session")
             ], spacing=4),
             bgcolor="#0FFFFFFF",
             padding=15,
@@ -379,17 +379,17 @@ class SFTApp:
         
         if local_hash == server_hash and local_hash:
             self.sync_msg.value = "ALL SYSTEMS SYNCED"
-            self.sync_msg.color = ft.colors.GREEN_400
+            self.sync_msg.color = ft.Colors.GREEN_400
             self.btn_sync.gradient = ft.LinearGradient(colors=["#065f46", "#064e3b"])
             self._sync_direction = "synced"
         elif local_hash and not server_hash:
             self.sync_msg.value = "READY TO INITIAL UPLOAD"
-            self.btn_sync.gradient = ft.LinearGradient(colors=[ft.colors.ORANGE_600, ft.colors.ORANGE_800])
+            self.btn_sync.gradient = ft.LinearGradient(colors=[ft.Colors.ORANGE_600, ft.Colors.ORANGE_800])
             self._sync_direction = "upload"
         else:
             self.sync_msg.value = "DATA MISMATCH DETECTED"
-            self.sync_msg.color = ft.colors.AMBER_400
-            self.btn_sync.gradient = ft.LinearGradient(colors=[ft.colors.BLUE_600, ft.colors.BLUE_800])
+            self.sync_msg.color = ft.Colors.AMBER_400
+            self.btn_sync.gradient = ft.LinearGradient(colors=[ft.Colors.BLUE_600, ft.Colors.BLUE_800])
             self._sync_direction = "diff"
 
         self.page.update()
@@ -415,12 +415,12 @@ class SFTApp:
         
         res = self.api.upload_save(self.world_dropdown.value, latest_local)
         if res and res.get("status") == "ok":
-            self._snack("Upload Success", ft.colors.GREEN_400)
+            self._snack("Upload Success", ft.Colors.GREEN_400)
         else:
-            self._snack("Upload Failed", ft.colors.RED_400)
+            self._snack("Upload Failed", ft.Colors.RED_400)
         self.refresh_sync_state()
 
-    def _snack(self, text, color=ft.colors.WHITE):
+    def _snack(self, text, color=ft.Colors.WHITE):
         sb = ft.SnackBar(ft.Text(text, color=color), bgcolor="#33000000", blur=10)
         self.page.overlay.append(sb)
         sb.open = True

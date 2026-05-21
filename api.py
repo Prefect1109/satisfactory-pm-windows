@@ -31,6 +31,12 @@ class APIClient:
             return response.json()
         return []
 
+    def get_save_metadata(self, world_id):
+        response = self.session.get(f"{BASE_URL}/worlds/{world_id}/save/metadata")
+        if response.status_code == 200:
+            return response.json()
+        return None
+
     def download_save(self, world_id, target_path):
         response = self.session.get(f"{BASE_URL}/worlds/{world_id}/save/latest", stream=True)
         if response.status_code == 200:

@@ -2,7 +2,7 @@ import flet as ft
 import os
 import sys
 from api import APIClient
-from utils import get_save_games_path, get_latest_local_save
+from utils import get_save_games_path, get_latest_local_save, get_file_hash
 
 VERSION = "1.0.0"
 
@@ -163,31 +163,91 @@ class SFTApp:
             self.page.show_snack_bar(ft.SnackBar(ft.Text("Save path not found!")))
             return
 
-        self.page.show_snack_bar(ft.SnackBar(ft.Text("Downloading...")))
-        result = self.api.download_save(self.world_dropdown.value, self.save_path)
-        if result:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Downloaded: {os.path.basename(result)}")))
-            self.update_local_save_info()
+        # Smart Sync: Check metadata
+        meta = self.api.get_save_metadata(self.world_dropdown.value)
+        if not meta or not meta.get("exists"):
+            self.page.show_snack_bar(ft.SnackBar(ft.Text("No saves found on server!")))
+            return
+
+        latest_local = get_latest_local_save(self.save_path)
+        local_hash = get_file_hash(latest_local) if latest_local else None
+        
+        if local_hash == meta.get("hash"):
+            self.page.show_snack_bar(ft.SnackBar(ft.Text("You already have the latest version!")))
+            return
+
+        def do_download(e):
+            self.page.dialog.open = False
+            self.page.show_snack_bar(ft.SnackBar(ft.Text("Downloading...")))
+            result = self.api.download_save(self.world_dropdown.value, self.save_path)
+            if result:
+                self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Downloaded: {os.path.basename(result)}")))
+                self.update_local_save_info()
+            else:
+                self.page.show_snack_bar(ft.SnackBar(ft.Text("Download failed!")))
+            self.page.update()
+
+        # If we have local changes, ask for confirmation
+        if latest_local:
+            self.page.dialog = ft.AlertDialog(
+                title=ft.Text("Confirm Download"),
+                content=ft.Text("Your local save will be replaced. Continue?"),
+                actions=[
+                    ft.TextButton("Yes, Replace", on_click=do_download),
+                    ft.TextButton("Cancel", on_click=lambda _: self.set_dialog(False)),
+                ]
+            )
+            self.page.dialog.open = True
             self.page.update()
         else:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Download failed!")))
+            do_download(None)
+
+    def set_dialog(self, open_state):
+        self.page.dialog.open = open_state
+        self.page.update()
 
     def on_upload(self, e):
         if not self.world_dropdown.value:
             self.page.show_snack_bar(ft.SnackBar(ft.Text("Select a world first!")))
             return
 
-        latest = get_latest_local_save(self.save_path)
-        if not latest:
+        latest_local = get_latest_local_save(self.save_path)
+        if not latest_local:
             self.page.show_snack_bar(ft.SnackBar(ft.Text("No local save to upload!")))
             return
 
-        self.page.show_snack_bar(ft.SnackBar(ft.Text("Uploading...")))
-        result = self.api.upload_save(self.world_dropdown.value, latest)
-        if result:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Upload successful!")))
+        # Smart Sync: Check if same version already on server
+        local_hash = get_file_hash(latest_local)
+        meta = self.api.get_save_metadata(self.world_dropdown.value)
+        if meta and meta.get("hash") == local_hash:
+            self.page.show_snack_bar(ft.SnackBar(ft.Text("This version is already on the server!")))
+            return
+
+        def do_upload(e):
+            self.page.dialog.open = False
+            self.page.show_snack_bar(ft.SnackBar(ft.Text("Uploading...")))
+            result = self.api.upload_save(self.world_dropdown.value, latest_local)
+            if result and result.get("status") == "ok":
+                diff_summary = result.get("diff", {}).get("micro_summary", "Upload successful!")
+                self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Success! {diff_summary}"), duration=5000))
+            else:
+                self.page.show_snack_bar(ft.SnackBar(ft.Text("Upload failed!")))
+            self.page.update()
+
+        # Confirm upload if server has a different version
+        if meta and meta.get("exists"):
+            self.page.dialog = ft.AlertDialog(
+                title=ft.Text("Confirm Upload"),
+                content=ft.Text("This will replace the latest save on the server. Continue?"),
+                actions=[
+                    ft.TextButton("Yes, Upload", on_click=do_upload),
+                    ft.TextButton("Cancel", on_click=lambda _: self.set_dialog(False)),
+                ]
+            )
+            self.page.dialog.open = True
+            self.page.update()
         else:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Upload failed!")))
+            do_upload(None)
 
     def logout(self, e):
         self.page.client_storage.remove("auth_token")

@@ -96,23 +96,54 @@ class SFTApp:
 
     def show_login_view(self):
         self.page.clean()
+
+        token_field = ft.TextField(
+            label="Connect Token",
+            hint_text="Paste token from /connect in bot",
+            border_color=ft.Colors.ORANGE_500,
+            width=340,
+            password=False,
+        )
+        error_text = ft.Text("", color=ft.Colors.RED_400, size=12)
+
+        def do_login(e):
+            token = token_field.value.strip() if token_field.value else ""
+            if not token:
+                error_text.value = "Enter a token"
+                self.page.update()
+                return
+            error_text.value = ""
+            self.page.update()
+            self.handle_deeplink(token)
+
+        token_field.on_submit = do_login
+
         self.page.add(
             ft.Container(
                 content=ft.Column([
                     ft.Icon(ft.Icons.FACTORY_ROUNDED, size=80, color=ft.Colors.ORANGE_500),
                     ft.Text("Satisfactory Tracker", size=32, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
                     ft.Text("Windows Companion App", color=ft.Colors.GREY_400, size=16),
-                    ft.Divider(height=60, color=ft.Colors.TRANSPARENT),
-                    ft.Text("Please connect your account via Telegram bot", text_align=ft.TextAlign.CENTER),
+                    ft.Divider(height=40, color=ft.Colors.TRANSPARENT),
                     ft.ElevatedButton(
-                        "Open Telegram Bot", 
+                        "Open Telegram Bot",
                         icon=ft.Icons.TELEGRAM,
                         color=ft.Colors.WHITE,
                         bgcolor=ft.Colors.BLUE_600,
                         on_click=lambda _: self.page.launch_url("https://t.me/SatisfactoryTrackerBot")
                     ),
+                    ft.Text("Use /connect in the bot to get your token", color=ft.Colors.GREY_500, size=12),
                     ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
-                    ft.Text("Waiting for deeplink connection...", italic=True, size=12, color=ft.Colors.GREY_500)
+                    token_field,
+                    error_text,
+                    ft.ElevatedButton(
+                        "Connect",
+                        icon=ft.Icons.LOGIN,
+                        color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.ORANGE_600,
+                        width=340,
+                        on_click=do_login,
+                    ),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),
                 alignment=ft.Alignment(0, 0),
                 expand=True,

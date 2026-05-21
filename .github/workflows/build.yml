@@ -32,7 +32,13 @@ jobs:
 
     - name: Build with flet pack
       run: |
-        flet pack main.py --name SFT-Tracker-Setup
+        flet pack main.py `
+          --name SFT-Tracker-Setup `
+          --icon assets/icon.ico `
+          --product-name "Satisfactory Save Tracker" `
+          --company-name "Satisfactory Saver LLC" `
+          --file-description "Satisfactory Save Tracker - Windows Companion" `
+          --copyright "Copyright 2025-2026 Satisfactory Saver LLC"
 
     - name: Show dist structure
       run: Get-ChildItem -Path dist -Recurse | Select-Object FullName

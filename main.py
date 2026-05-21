@@ -108,13 +108,17 @@ class SFTApp:
             self.page.window.width = 500
             self.page.window.height = 750
             self.page.window.resizable = False
-        except AttributeError:
-            self.page.window_width = 500
-            self.page.window_height = 750
-            self.page.window_resizable = False
-        self.page.theme_mode = ft.ThemeMode.DARK
-        self.page.padding = 0
-        self.page.fonts = {"RobotoMono": "https://github.com/google/fonts/raw/main/apache/robotomono/RobotoMono%5Bwght%5D.ttf"}
+        except Exception:
+            try:
+                self.page.window_width = 500
+                self.page.window_height = 750
+                self.page.window_resizable = False
+            except Exception:
+                pass
+        try:
+            self.page.theme_mode = ft.ThemeMode.DARK
+        except Exception:
+            pass
 
         self.check_for_updates()
 

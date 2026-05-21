@@ -4,7 +4,7 @@
 This project follows an incremental release model to ensure steady progress.
 
 - **Versioning**: Always increment the version in `main.py` for every change.
-- **Git Tags**: Every push to `main` must be tagged with the corresponding version (e.g., `v1.2.1`).
+- **Git Tags**: Every push to `main` must be tagged with the corresponding version (e.g., `v1.2.2`).
 - **Automation**: New tags trigger the build workflow to produce a fresh `.exe`.
 
 ## UI Standards

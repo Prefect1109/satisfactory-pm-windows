@@ -9,7 +9,7 @@ import datetime
 from api import APIClient
 from utils import get_save_games_path, get_latest_local_save, get_file_hash, get_session_name
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 # --- Token Helpers ---
 def _token_path():

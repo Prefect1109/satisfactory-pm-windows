@@ -114,7 +114,7 @@ class SFTApp:
                     ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
                     ft.Text("Waiting for deeplink connection...", italic=True, size=12, color=ft.Colors.GREY_500)
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment(0, 0),
                 expand=True,
                 padding=40
             )
@@ -173,7 +173,7 @@ class SFTApp:
                 
                 ft.Container(
                     content=self.world_dropdown,
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment(0, 0),
                     padding=ft.padding.only(bottom=10)
                 ),
                 
@@ -181,7 +181,7 @@ class SFTApp:
                 
                 ft.Container(
                     content=self.sync_message,
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment(0, 0),
                     padding=ft.padding.symmetric(vertical=15)
                 ),
 

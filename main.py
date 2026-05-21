@@ -1,10 +1,12 @@
 import flet as ft
 import os
 import sys
+import threading
+import time
 from api import APIClient
 from utils import get_save_games_path, get_latest_local_save, get_file_hash, get_session_name
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 class SFTApp:
     def __init__(self, page: ft.Page):
@@ -12,6 +14,11 @@ class SFTApp:
         self.api = APIClient()
         self.save_paths = get_save_games_path()
         self.save_path = self.save_paths[0] if self.save_paths else None
+        
+        self.local_save_info = None
+        self.server_save_info = None
+        self.auto_refresh_running = False
+
         self.init_ui()
 
     def check_for_updates(self):
@@ -25,44 +32,35 @@ class SFTApp:
             download_url = version_info.get("url")
 
             if remote_version != VERSION or force_update:
-                # Validate URL for security
                 if not download_url or not download_url.startswith("https://"):
-                    print("Invalid download URL. Must be HTTPS.")
                     return
 
-                # Show update dialog
                 def close_app(e):
-                    import subprocess
-                    # Download and run installer
-                    # This is simplified, in real life we would download it first
                     self.page.launch_url(download_url)
                     self.page.window_close()
 
                 self.page.dialog = ft.AlertDialog(
-                    title=ft.Text("Update Available"),
+                    title=ft.Text("Update Available", color=ft.colors.BLUE_400),
                     content=ft.Text(f"A new version ({remote_version}) is available. Please update to continue."),
-                    actions=[
-                        ft.TextButton("Update Now", on_click=close_app),
-                    ],
+                    actions=[ft.TextButton("Update Now", on_click=close_app)],
                     modal=True
                 )
                 self.page.dialog.open = True
                 self.page.update()
-        except Exception as e:
-            print(f"Update check failed: {e}")
+        except Exception:
+            pass
 
     def init_ui(self):
         self.page.title = "Satisfactory Session Tracker"
-        self.page.window_width = 450
-        self.page.window_height = 650
+        self.page.window_width = 500
+        self.page.window_height = 750
         self.page.window_resizable = False
         self.page.theme_mode = ft.ThemeMode.DARK
-        self.page.padding = 20
+        self.page.padding = 0
+        self.page.fonts = {"RobotoMono": "https://github.com/google/fonts/raw/main/apache/robotomono/RobotoMono%5Bwght%5D.ttf"}
 
-        # Check for updates first
         self.check_for_updates()
 
-        # Load token if exists
         saved_token = self.page.client_storage.get("auth_token")
         if saved_token:
             self.api.token = saved_token
@@ -74,18 +72,27 @@ class SFTApp:
     def show_login_view(self):
         self.page.clean()
         self.page.add(
-            ft.Column([
-                ft.Text("Satisfactory Tracker", size=32, weight=ft.FontWeight.BOLD),
-                ft.Text("Windows Companion App", color=ft.colors.GREY_400),
-                ft.Divider(height=40),
-                ft.Text("Please connect your account via Telegram bot"),
-                ft.ElevatedButton(
-                    "Open Telegram Bot", 
-                    icon=ft.icons.TELEGRAM, 
-                    on_click=lambda _: self.page.launch_url("https://t.me/SatisfactoryTrackerBot")
-                ),
-                ft.Text("Waiting for connection...", italic=True, size=12, color=ft.colors.GREY_500)
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=20)
+            ft.Container(
+                content=ft.Column([
+                    ft.Icon(ft.icons.FACTORY_ROUNDED, size=80, color=ft.colors.ORANGE_500),
+                    ft.Text("Satisfactory Tracker", size=32, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+                    ft.Text("Windows Companion App", color=ft.colors.GREY_400, size=16),
+                    ft.Divider(height=60, color=ft.colors.TRANSPARENT),
+                    ft.Text("Please connect your account via Telegram bot", text_align=ft.TextAlign.CENTER),
+                    ft.ElevatedButton(
+                        "Open Telegram Bot", 
+                        icon=ft.icons.TELEGRAM,
+                        color=ft.colors.WHITE,
+                        bgcolor=ft.colors.BLUE_600,
+                        on_click=lambda _: self.page.launch_url("https://t.me/SatisfactoryTrackerBot")
+                    ),
+                    ft.Divider(height=20, color=ft.colors.TRANSPARENT),
+                    ft.Text("Waiting for deeplink connection...", italic=True, size=12, color=ft.colors.GREY_500)
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),
+                alignment=ft.alignment.center,
+                expand=True,
+                padding=40
+            )
         )
         self.page.update()
 
@@ -101,125 +108,221 @@ class SFTApp:
         self.world_dropdown = ft.Dropdown(
             label="Select World",
             options=world_options,
-            width=300,
+            width=400,
+            border_color=ft.colors.ORANGE_500,
             on_change=self.on_world_change
         )
 
         premium_status = "Premium" if me.get("active") else "Free"
         premium_color = ft.colors.AMBER if me.get("active") else ft.colors.BLUE_GREY_400
 
-        self.status_text = ft.Text(f"Account: {premium_status}", color=premium_color, weight=ft.FontWeight.BOLD)
-        
-        self.local_save_text = ft.Text("Detecting local saves...", size=12, color=ft.colors.GREY_400)
-        self.update_local_save_info()
+        # UI Elements for sync status
+        self.local_status_card = self._build_status_card("Local Save", ft.icons.COMPUTER)
+        self.server_status_card = self._build_status_card("Server Save", ft.icons.CLOUD)
+        self.sync_message = ft.Text("", size=14, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER)
 
-        self.page.clean()
-        self.page.add(
-            ft.Column([
+        self.btn_download = ft.ElevatedButton(
+            "Download", icon=ft.icons.DOWNLOAD, on_click=self.on_download, 
+            style=ft.ButtonStyle(color=ft.colors.WHITE, bgcolor=ft.colors.GREEN_600), disabled=True
+        )
+        self.btn_upload = ft.ElevatedButton(
+            "Upload", icon=ft.icons.UPLOAD, on_click=self.on_upload,
+            style=ft.ButtonStyle(color=ft.colors.WHITE, bgcolor=ft.colors.ORANGE_600), disabled=True
+        )
+
+        main_content = ft.Container(
+            padding=20,
+            content=ft.Column([
                 ft.Row([
+                    ft.Icon(ft.icons.FACTORY_ROUNDED, color=ft.colors.ORANGE_500, size=30),
                     ft.Text("SFT Companion", size=24, weight=ft.FontWeight.BOLD),
                     ft.Container(expand=True),
-                    self.status_text
-                ]),
-                ft.Divider(),
-                self.world_dropdown,
-                ft.Divider(height=20),
-                ft.Row([
-                    ft.ElevatedButton(
-                        "Download Latest", 
-                        icon=ft.icons.DOWNLOAD, 
-                        on_click=self.on_download,
-                        color=ft.colors.GREEN_400
-                    ),
-                    ft.ElevatedButton(
-                        "Upload New", 
-                        icon=ft.icons.UPLOAD, 
-                        on_click=self.on_upload,
-                        color=ft.colors.ORANGE_400
-                    ),
-                ], alignment=ft.MainAxisAlignment.CENTER),
-                ft.Divider(height=40),
-                ft.Column(self._build_save_folder_ui(), spacing=5),
+                    ft.Container(
+                        content=ft.Text(f"{premium_status}", color=ft.colors.WHITE, weight=ft.FontWeight.BOLD, size=12),
+                        bgcolor=premium_color,
+                        padding=ft.padding.symmetric(horizontal=10, vertical=4),
+                        border_radius=15
+                    )
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                ft.Divider(height=20, color=ft.colors.GREY_800),
+                
+                ft.Container(
+                    content=self.world_dropdown,
+                    alignment=ft.alignment.center,
+                    padding=ft.padding.only(bottom=10)
+                ),
+                
+                ft.Row([self.local_status_card, self.server_status_card], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                
+                ft.Container(
+                    content=self.sync_message,
+                    alignment=ft.alignment.center,
+                    padding=ft.padding.symmetric(vertical=15)
+                ),
+
+                ft.Row([self.btn_download, self.btn_upload], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+                
+                ft.Divider(height=30, color=ft.colors.GREY_800),
+                ft.Column(self._build_save_folder_ui(), spacing=10),
+                
                 ft.Container(expand=True),
-                ft.TextButton("Logout", on_click=self.logout, font_family="monospace")
+                ft.Row([
+                    ft.Text(f"v{VERSION}", size=10, color=ft.colors.GREY_600),
+                    ft.Container(expand=True),
+                    ft.TextButton("Logout", on_click=self.logout, icon=ft.icons.LOGOUT, icon_color=ft.colors.RED_400, style=ft.ButtonStyle(color=ft.colors.RED_400))
+                ])
             ], expand=True)
         )
+
+        self.page.clean()
+        self.page.add(main_content)
         self.page.update()
 
+        # Start auto-refresh
+        if not self.auto_refresh_running:
+            self.auto_refresh_running = True
+            threading.Thread(target=self.auto_refresh_loop, daemon=True).start()
+
+    def _build_status_card(self, title, icon):
+        return ft.Container(
+            width=210,
+            padding=15,
+            border_radius=10,
+            bgcolor=ft.colors.SURFACE_VARIANT,
+            content=ft.Column([
+                ft.Row([ft.Icon(icon, size=20, color=ft.colors.BLUE_200), ft.Text(title, weight=ft.FontWeight.BOLD)]),
+                ft.Text("Waiting...", size=12, color=ft.colors.GREY_400, key="info"),
+                ft.Text("-", size=11, color=ft.colors.GREY_500, key="session")
+            ])
+        )
+
+    def _update_card_ui(self, card, info_text, session_text, color=ft.colors.GREY_400):
+        card.content.controls[1].value = info_text
+        card.content.controls[1].color = color
+        card.content.controls[2].value = session_text
+
     def _build_save_folder_ui(self):
-        ui = [ft.Text("Save Folder Status:", weight=ft.FontWeight.BOLD)]
-        
+        ui = [
+            ft.Row([
+                ft.Text("Configuration", weight=ft.FontWeight.BOLD, size=16),
+                ft.IconButton(ft.icons.FOLDER_OPEN, on_click=self.on_open_folder, tooltip="Open Save Folder")
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+        ]
         if len(self.save_paths) > 1:
-            # Show a dropdown if multiple Steam IDs
             folder_options = [ft.dropdown.Option(key=p, text=os.path.basename(p)) for p in self.save_paths]
             self.folder_dropdown = ft.Dropdown(
-                label="Select Account ID",
+                label="Steam/Epic Account ID",
                 options=folder_options,
                 value=self.save_path,
-                width=300,
-                on_change=self.on_folder_change
+                width=400,
+                on_change=self.on_folder_change,
+                text_size=12
             )
             ui.append(self.folder_dropdown)
-            ui.append(ft.Text(f"Path: {os.path.dirname(self.save_path)}/...", size=11, color=ft.colors.GREY_400))
         else:
-            ui.append(ft.Text(f"Path: {self.save_path or 'Not Found'}", size=11, color=ft.colors.GREY_400))
-            
-        ui.append(self.local_save_text)
+            ui.append(ft.Text(f"Save Path: {self.save_path or 'Not Found'}", size=11, color=ft.colors.GREY_400, selectable=True))
         return ui
+
+    def on_open_folder(self, e):
+        if self.save_path and os.path.exists(self.save_path):
+            os.startfile(self.save_path) if sys.platform == "win32" else os.system(f'xdg-open "{self.save_path}"')
+        else:
+            self.page.show_snack_bar(ft.SnackBar(ft.Text("Save folder not found!")))
 
     def on_folder_change(self, e):
         self.save_path = self.folder_dropdown.value
-        self.update_local_save_info()
-        self.page.update()
-
-    def update_local_save_info(self):
-        latest = get_latest_local_save(self.save_path)
-        if latest:
-            self.local_save_text.value = f"Latest local: {os.path.basename(latest)}"
-        else:
-            self.local_save_text.value = "No local .sav files found"
+        self.refresh_sync_state()
 
     def on_world_change(self, e):
-        pass
+        self.refresh_sync_state()
+
+    def auto_refresh_loop(self):
+        while self.auto_refresh_running:
+            time.sleep(5)
+            if self.page.session_id:
+                self.refresh_sync_state()
+
+    def refresh_sync_state(self):
+        if not self.world_dropdown or not self.world_dropdown.value:
+            self._update_card_ui(self.server_status_card, "Select a world", "-")
+            self.btn_download.disabled = True
+            self.btn_upload.disabled = True
+            try:
+                self.page.update()
+            except Exception:
+                pass
+            return
+
+        # Local
+        latest_local = get_latest_local_save(self.save_path)
+        local_hash = None
+        if latest_local:
+            local_hash = get_file_hash(latest_local)
+            session_name = get_session_name(latest_local)
+            mtime = time.strftime('%Y-%m-%d %H:%M', time.localtime(os.path.getmtime(latest_local)))
+            self._update_card_ui(self.local_status_card, f"Modified: {mtime}", f"Session: {session_name or 'Unknown'}", ft.colors.WHITE)
+        else:
+            self._update_card_ui(self.local_status_card, "No saves found", "-", ft.colors.RED_300)
+
+        # Server
+        meta = self.api.get_save_metadata(self.world_dropdown.value)
+        server_hash = None
+        if meta and meta.get("exists"):
+            server_hash = meta.get("hash")
+            session_name = meta.get("session_name", "Unknown")
+            updated_at = meta.get("updated_at", "").replace("T", " ")[:16]
+            self._update_card_ui(self.server_status_card, f"Updated: {updated_at}", f"Session: {session_name}", ft.colors.WHITE)
+        else:
+            self._update_card_ui(self.server_status_card, "No saves on server", "-", ft.colors.ORANGE_300)
+
+        # Compare
+        self.btn_download.disabled = False if server_hash else True
+        self.btn_upload.disabled = False if local_hash else True
+
+        if local_hash and server_hash:
+            if local_hash == server_hash:
+                self.sync_message.value = "✔️ Up to date"
+                self.sync_message.color = ft.colors.GREEN_400
+            else:
+                self.sync_message.value = "⚠️ Out of sync"
+                self.sync_message.color = ft.colors.ORANGE_400
+        else:
+            self.sync_message.value = "Ready to sync"
+            self.sync_message.color = ft.colors.BLUE_400
+
+        try:
+            self.page.update()
+        except Exception:
+            pass
 
     def on_download(self, e):
-        if not self.world_dropdown.value:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Select a world first!")))
-            return
-        
-        if not self.save_path:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Save path not found!")))
+        if not self.world_dropdown.value or not self.save_path:
             return
 
-        # Smart Sync: Check metadata
         meta = self.api.get_save_metadata(self.world_dropdown.value)
         if not meta or not meta.get("exists"):
             self.page.show_snack_bar(ft.SnackBar(ft.Text("No saves found on server!")))
             return
 
         latest_local = get_latest_local_save(self.save_path)
-        local_hash = get_file_hash(latest_local) if latest_local else None
         
-        if local_hash == meta.get("hash"):
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("You already have the latest version!")))
-            return
-
         def do_download(e):
             self.page.dialog.open = False
             self.page.show_snack_bar(ft.SnackBar(ft.Text("Downloading...")))
+            self.page.update()
+            
             result = self.api.download_save(self.world_dropdown.value, self.save_path)
             if result:
-                self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Downloaded: {os.path.basename(result)}")))
-                self.update_local_save_info()
+                self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Downloaded: {os.path.basename(result)}", color=ft.colors.GREEN_400)))
+                self.refresh_sync_state()
             else:
-                self.page.show_snack_bar(ft.SnackBar(ft.Text("Download failed!")))
+                self.page.show_snack_bar(ft.SnackBar(ft.Text("Download failed!", color=ft.colors.RED_400)))
             self.page.update()
 
-        # If we have local changes, ask for confirmation
         if latest_local:
             self.page.dialog = ft.AlertDialog(
-                title=ft.Text("Confirm Download"),
-                content=ft.Text("Your local save will be replaced. Continue?"),
+                title=ft.Text("Confirm Download", color=ft.colors.ORANGE_400),
+                content=ft.Text("Your local save will be replaced by the server version. Continue?"),
                 actions=[
                     ft.TextButton("Yes, Replace", on_click=do_download),
                     ft.TextButton("Cancel", on_click=lambda _: self.set_dialog(False)),
@@ -236,15 +339,12 @@ class SFTApp:
 
     def on_upload(self, e):
         if not self.world_dropdown.value:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Select a world first!")))
             return
 
         latest_local = get_latest_local_save(self.save_path)
         if not latest_local:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("No local save to upload!")))
             return
 
-        # Smart Sync: Check if same version already on server
         local_hash = get_file_hash(latest_local)
         local_session = get_session_name(latest_local)
         meta = self.api.get_save_metadata(self.world_dropdown.value)
@@ -257,26 +357,28 @@ class SFTApp:
         warning_msg = None
         
         if server_session and local_session and server_session != local_session:
-            warning_msg = f"⚠️ MISMATCH!\nServer: '{server_session}'\nLocal: '{local_session}'\nUpload anyway?"
+            warning_msg = f"⚠️ MISMATCH RISK\n\nServer Session: '{server_session}'\nLocal Session: '{local_session}'\n\nAre you sure you want to overwrite?"
 
         def do_upload(e):
             self.page.dialog.open = False
             self.page.show_snack_bar(ft.SnackBar(ft.Text("Uploading...")))
+            self.page.update()
+            
             result = self.api.upload_save(self.world_dropdown.value, latest_local)
             if result and result.get("status") == "ok":
-                diff_summary = result.get("diff", {}).get("micro_summary", "Upload successful!")
-                self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Success! {diff_summary}"), duration=5000))
+                diff = result.get("diff", {}).get("micro_summary", "")
+                self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Success! {diff}", color=ft.colors.GREEN_400), duration=5000))
+                self.refresh_sync_state()
             else:
-                self.page.show_snack_bar(ft.SnackBar(ft.Text("Upload failed!")))
+                self.page.show_snack_bar(ft.SnackBar(ft.Text("Upload failed!", color=ft.colors.RED_400)))
             self.page.update()
 
-        # Confirm upload if server has a different version or session mismatch
         if warning_msg:
             self.page.dialog = ft.AlertDialog(
                 title=ft.Text("Cross-World Overwrite Risk", color=ft.colors.RED_400),
                 content=ft.Text(warning_msg),
                 actions=[
-                    ft.TextButton("Yes, Overwrite", on_click=do_upload, icon=ft.icons.WARNING_AMBER_ROUNDED),
+                    ft.TextButton("Yes, Overwrite", on_click=do_upload, icon=ft.icons.WARNING_AMBER_ROUNDED, style=ft.ButtonStyle(color=ft.colors.RED_400)),
                     ft.TextButton("Cancel", on_click=lambda _: self.set_dialog(False)),
                 ]
             )
@@ -297,6 +399,7 @@ class SFTApp:
             do_upload(None)
 
     def logout(self, e):
+        self.auto_refresh_running = False
         self.page.client_storage.remove("auth_token")
         self.api.token = None
         self.show_login_view()
@@ -306,18 +409,15 @@ class SFTApp:
             self.page.client_storage.set("auth_token", self.api.token)
             self.show_main_view()
         else:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Login failed! Invalid token.")))
+            self.page.show_snack_bar(ft.SnackBar(ft.Text("Login failed! Invalid token.", color=ft.colors.RED_400)))
 
 def main(page: ft.Page):
     import re
     app = SFTApp(page)
 
-    # Check for token in command line args (deeplink)
-    # sft://auth?token=XXX -> sys.argv might contain this or just part of it
     for arg in sys.argv:
         if "sft://auth?token=" in arg:
             token = arg.split("token=")[-1].strip()
-            # Security: Validate token format (alphanumeric, reasonable length)
             if re.match(r"^[A-Za-z0-9\-_]{16,128}$", token):
                 app.handle_deeplink(token)
             else:

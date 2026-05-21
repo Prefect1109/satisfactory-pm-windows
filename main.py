@@ -38,16 +38,20 @@ class SFTApp:
     def __init__(self, page: ft.Page):
         self.page = page
         self.api = APIClient()
-        self.save_paths = get_save_games_path()
-        self.save_path = self.save_paths[0] if self.save_paths else None
-        
+        self.save_paths = []
+        self.save_path = None
+
         self.local_save_info = None
         self.server_save_info = None
         self.auto_refresh_running = False
 
+        self._server_meta_cache = {}   # world_id → (meta, timestamp)
+        self._SERVER_TTL = 30          # seconds before re-fetching server meta
+
         self.init_ui()
 
     def check_for_updates(self):
+        # ... rest of check_for_updates ...
         try:
             version_info = self.api.get_version()
             if not version_info:
@@ -120,15 +124,32 @@ class SFTApp:
         except Exception:
             pass
 
-        self.check_for_updates()
+        # Async check for updates
+        threading.Thread(target=self.check_for_updates, daemon=True).start()
 
         saved_token = _load_token()
         if saved_token:
             self.api.token = saved_token
             self.api.session.headers.update({"Authorization": f"Bearer {saved_token}"})
-            self.show_main_view()
+            # Show loader then load main view
+            self.show_loading_view()
+            threading.Thread(target=self.show_main_view, daemon=True).start()
         else:
             self.show_login_view()
+
+    def show_loading_view(self, text="Loading data..."):
+        self.page.clean()
+        self.page.add(
+            ft.Container(
+                content=ft.Column([
+                    ft.ProgressRing(color=ft.Colors.ORANGE_500, width=50, height=50),
+                    ft.Text(text, color=ft.Colors.GREY_400)
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+                expand=True,
+                alignment=ft.Alignment(0, 0)
+            )
+        )
+        self.page.update()
 
     def show_login_view(self):
         self.page.clean()
@@ -189,13 +210,31 @@ class SFTApp:
         self.page.update()
 
     def show_main_view(self):
-        me = self.api.get_me()
-        if not me:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            with ThreadPoolExecutor(max_workers=3) as ex:
+                f_me = ex.submit(self.api.get_me)
+                f_worlds = ex.submit(self.api.get_worlds)
+                f_paths = ex.submit(get_save_games_path)
+                me = f_me.result()
+                worlds = f_worlds.result()
+                self.save_paths = f_paths.result()
+
+            if not me:
+                self.show_login_view()
+                return
+
+            if not self.save_path and self.save_paths:
+                self.save_path = self.save_paths[0]
+        except Exception as e:
+            print(f"Error loading initial data: {e}")
             self.show_login_view()
             return
 
-        worlds = self.api.get_worlds()
         world_options = [ft.dropdown.Option(key=str(w["id"]), text=w["name"]) for w in worlds]
+        
+        # Build UI controls (this must be fast or we can move it to main thread if needed)
+        # But Flet controls are fine to create in threads as long as we add them to page safely
         
         self.world_dropdown = ft.Dropdown(
             label="Select World",
@@ -323,56 +362,74 @@ class SFTApp:
 
     def on_folder_change(self, e):
         self.save_path = self.folder_dropdown.value
-        self.refresh_sync_state()
+        self.refresh_sync_state(force_server=True)
 
     def on_world_change(self, e):
-        self.refresh_sync_state()
+        self.refresh_sync_state(force_server=True)
 
     def auto_refresh_loop(self):
+        server_tick = 0
         while self.auto_refresh_running:
-            time.sleep(5)
+            time.sleep(3)
             try:
-                self.refresh_sync_state()
+                force_server = server_tick <= 0
+                self._refresh_local()
+                if force_server:
+                    self._refresh_server()
+                    server_tick = self._SERVER_TTL // 3
+                else:
+                    server_tick -= 1
+                self._update_sync_ui()
             except Exception:
                 break
 
-    def refresh_sync_state(self):
-        if not self.world_dropdown or not self.world_dropdown.value:
-            self._update_card_ui(self.server_status_card, "Select a world", "-")
-            self.btn_download.disabled = True
-            self.btn_upload.disabled = True
-            try:
-                self.page.update()
-            except Exception:
-                pass
-            return
+    def _get_server_meta(self, world_id, force=False):
+        cached = self._server_meta_cache.get(world_id)
+        if cached and not force:
+            meta, ts = cached
+            if time.time() - ts < self._SERVER_TTL:
+                return meta
+        meta = self.api.get_save_metadata(world_id)
+        self._server_meta_cache[world_id] = (meta, time.time())
+        return meta
 
-        # Local
+    def _refresh_local(self):
+        if not getattr(self, 'world_dropdown', None):
+            return
         latest_local = get_latest_local_save(self.save_path)
-        local_hash = None
         if latest_local:
-            local_hash = get_file_hash(latest_local)
+            self._local_hash = get_file_hash(latest_local)
+            self._local_path = latest_local
             session_name = get_session_name(latest_local)
             mtime = time.strftime('%Y-%m-%d %H:%M', time.localtime(os.path.getmtime(latest_local)))
             self._update_card_ui(self.local_status_card, f"Modified: {mtime}", f"Session: {session_name or 'Unknown'}", ft.Colors.WHITE)
         else:
+            self._local_hash = None
+            self._local_path = None
             self._update_card_ui(self.local_status_card, "No saves found", "-", ft.Colors.RED_300)
 
-        # Server
-        meta = self.api.get_save_metadata(self.world_dropdown.value)
-        server_hash = None
+    def _refresh_server(self, force=False):
+        if not getattr(self, 'world_dropdown', None) or not self.world_dropdown.value:
+            self._server_hash = None
+            self._update_card_ui(self.server_status_card, "Select a world", "-")
+            return
+        meta = self._get_server_meta(self.world_dropdown.value, force=force)
         if meta and meta.get("exists"):
-            server_hash = meta.get("hash")
+            self._server_hash = meta.get("hash")
             session_name = meta.get("session_name", "Unknown")
             updated_at = meta.get("updated_at", "").replace("T", " ")[:16]
             self._update_card_ui(self.server_status_card, f"Updated: {updated_at}", f"Session: {session_name}", ft.Colors.WHITE)
         else:
+            self._server_hash = None
             self._update_card_ui(self.server_status_card, "No saves on server", "-", ft.Colors.ORANGE_300)
 
-        # Compare
-        self.btn_download.disabled = False if server_hash else True
-        self.btn_upload.disabled = False if local_hash else True
-
+    def _update_sync_ui(self):
+        local_hash = getattr(self, '_local_hash', None)
+        server_hash = getattr(self, '_server_hash', None)
+        if not getattr(self, 'btn_download', None):
+            return
+        self.btn_download.disabled = not bool(server_hash)
+        self.btn_upload.disabled = not bool(local_hash)
         if local_hash and server_hash:
             if local_hash == server_hash:
                 self.sync_message.value = "✔️ Up to date"
@@ -383,11 +440,15 @@ class SFTApp:
         else:
             self.sync_message.value = "Ready to sync"
             self.sync_message.color = ft.Colors.BLUE_400
-
         try:
             self.page.update()
         except Exception:
             pass
+
+    def refresh_sync_state(self, force_server=False):
+        self._refresh_local()
+        self._refresh_server(force=force_server)
+        self._update_sync_ui()
 
     def on_download(self, e):
         if not self.world_dropdown.value or not self.save_path:
@@ -407,7 +468,7 @@ class SFTApp:
             result = self.api.download_save(self.world_dropdown.value, self.save_path)
             if result:
                 self._snack(f"Downloaded: {os.path.basename(result)}", ft.Colors.GREEN_400)
-                self.refresh_sync_state()
+                self.refresh_sync_state(force_server=True)
             else:
                 self._snack("Download failed!", ft.Colors.RED_400)
 
@@ -455,7 +516,7 @@ class SFTApp:
             if result and result.get("status") == "ok":
                 diff = result.get("diff", {}).get("micro_summary", "")
                 self._snack(f"Success! {diff}", ft.Colors.GREEN_400)
-                self.refresh_sync_state()
+                self.refresh_sync_state(force_server=True)
             else:
                 self._snack("Upload failed!", ft.Colors.RED_400)
 

@@ -63,24 +63,55 @@ class SFTApp:
 
                 def close_app(e):
                     webbrowser.open(download_url)
-                    self.page.window_close()
+                    try:
+                        self.page.window.close()
+                    except AttributeError:
+                        self.page.window_close()
 
-                self.page.dialog = ft.AlertDialog(
+                self._open_dialog(ft.AlertDialog(
                     title=ft.Text("Update Available", color=ft.Colors.BLUE_400),
                     content=ft.Text(f"A new version ({remote_version}) is available. Please update to continue."),
                     actions=[ft.TextButton("Update Now", on_click=close_app)],
                     modal=True
-                )
-                self.page.dialog.open = True
-                self.page.update()
+                ))
         except Exception:
             pass
 
+    def _snack(self, text, color=None):
+        sb = ft.SnackBar(ft.Text(text, color=color) if color else ft.Text(text))
+        try:
+            self.page.open(sb)
+        except Exception:
+            self.page.show_snack_bar(sb)  # noqa: fallback for older flet
+
+    def _open_dialog(self, dialog):
+        try:
+            self.page.open(dialog)
+        except Exception:
+            self.page.dialog = dialog
+            dialog.open = True
+            self.page.update()
+
+    def _close_dialog(self, dialog=None):
+        try:
+            self.page.close(dialog or self.page.dialog)
+        except Exception:
+            try:
+                self.page.dialog.open = False
+            except Exception:
+                pass
+            self.page.update()
+
     def init_ui(self):
         self.page.title = "Satisfactory Session Tracker"
-        self.page.window_width = 500
-        self.page.window_height = 750
-        self.page.window_resizable = False
+        try:
+            self.page.window.width = 500
+            self.page.window.height = 750
+            self.page.window.resizable = False
+        except AttributeError:
+            self.page.window_width = 500
+            self.page.window_height = 750
+            self.page.window_resizable = False
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.padding = 0
         self.page.fonts = {"RobotoMono": "https://github.com/google/fonts/raw/main/apache/robotomono/RobotoMono%5Bwght%5D.ttf"}
@@ -167,8 +198,8 @@ class SFTApp:
             options=world_options,
             width=400,
             border_color=ft.Colors.ORANGE_500,
-            on_change=self.on_world_change
         )
+        self.world_dropdown.on_change = self.on_world_change
 
         premium_status = "Premium" if me.get("active") else "Free"
         premium_color = ft.Colors.AMBER if me.get("active") else ft.Colors.BLUE_GREY_400
@@ -272,9 +303,9 @@ class SFTApp:
                 options=folder_options,
                 value=self.save_path,
                 width=400,
-                on_change=self.on_folder_change,
-                text_size=12
+                text_size=12,
             )
+            self.folder_dropdown.on_change = self.on_folder_change
             ui.append(self.folder_dropdown)
         else:
             ui.append(ft.Text(f"Save Path: {self.save_path or 'Not Found'}", size=11, color=ft.Colors.GREY_400, selectable=True))
@@ -284,7 +315,7 @@ class SFTApp:
         if self.save_path and os.path.exists(self.save_path):
             os.startfile(self.save_path) if sys.platform == "win32" else os.system(f'xdg-open "{self.save_path}"')
         else:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Save folder not found!")))
+            self._snack("Save folder not found!")
 
     def on_folder_change(self, e):
         self.save_path = self.folder_dropdown.value
@@ -296,8 +327,10 @@ class SFTApp:
     def auto_refresh_loop(self):
         while self.auto_refresh_running:
             time.sleep(5)
-            if self.page.session_id:
+            try:
                 self.refresh_sync_state()
+            except Exception:
+                break
 
     def refresh_sync_state(self):
         if not self.world_dropdown or not self.world_dropdown.value:
@@ -358,41 +391,34 @@ class SFTApp:
 
         meta = self.api.get_save_metadata(self.world_dropdown.value)
         if not meta or not meta.get("exists"):
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("No saves found on server!")))
+            self._snack("No saves found on server!")
             return
 
         latest_local = get_latest_local_save(self.save_path)
-        
+        dlg = None
+
         def do_download(e):
-            self.page.dialog.open = False
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Downloading...")))
-            self.page.update()
-            
+            self._close_dialog(dlg)
+            self._snack("Downloading...")
             result = self.api.download_save(self.world_dropdown.value, self.save_path)
             if result:
-                self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Downloaded: {os.path.basename(result)}", color=ft.Colors.GREEN_400)))
+                self._snack(f"Downloaded: {os.path.basename(result)}", ft.Colors.GREEN_400)
                 self.refresh_sync_state()
             else:
-                self.page.show_snack_bar(ft.SnackBar(ft.Text("Download failed!", color=ft.Colors.RED_400)))
-            self.page.update()
+                self._snack("Download failed!", ft.Colors.RED_400)
 
         if latest_local:
-            self.page.dialog = ft.AlertDialog(
+            dlg = ft.AlertDialog(
                 title=ft.Text("Confirm Download", color=ft.Colors.ORANGE_400),
                 content=ft.Text("Your local save will be replaced by the server version. Continue?"),
                 actions=[
                     ft.TextButton("Yes, Replace", on_click=do_download),
-                    ft.TextButton("Cancel", on_click=lambda _: self.set_dialog(False)),
+                    ft.TextButton("Cancel", on_click=lambda _: self._close_dialog(dlg)),
                 ]
             )
-            self.page.dialog.open = True
-            self.page.update()
+            self._open_dialog(dlg)
         else:
             do_download(None)
-
-    def set_dialog(self, open_state):
-        self.page.dialog.open = open_state
-        self.page.update()
 
     def on_upload(self, e):
         if not self.world_dropdown.value:
@@ -405,53 +431,50 @@ class SFTApp:
         local_hash = get_file_hash(latest_local)
         local_session = get_session_name(latest_local)
         meta = self.api.get_save_metadata(self.world_dropdown.value)
-        
+
         if meta and meta.get("hash") == local_hash:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("This version is already on the server!")))
+            self._snack("This version is already on the server!")
             return
 
         server_session = meta.get("session_name") if meta and meta.get("exists") else None
         warning_msg = None
-        
+
         if server_session and local_session and server_session != local_session:
             warning_msg = f"⚠️ MISMATCH RISK\n\nServer Session: '{server_session}'\nLocal Session: '{local_session}'\n\nAre you sure you want to overwrite?"
 
+        dlg = None
+
         def do_upload(e):
-            self.page.dialog.open = False
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Uploading...")))
-            self.page.update()
-            
+            self._close_dialog(dlg)
+            self._snack("Uploading...")
             result = self.api.upload_save(self.world_dropdown.value, latest_local)
             if result and result.get("status") == "ok":
                 diff = result.get("diff", {}).get("micro_summary", "")
-                self.page.show_snack_bar(ft.SnackBar(ft.Text(f"Success! {diff}", color=ft.Colors.GREEN_400), duration=5000))
+                self._snack(f"Success! {diff}", ft.Colors.GREEN_400)
                 self.refresh_sync_state()
             else:
-                self.page.show_snack_bar(ft.SnackBar(ft.Text("Upload failed!", color=ft.Colors.RED_400)))
-            self.page.update()
+                self._snack("Upload failed!", ft.Colors.RED_400)
 
         if warning_msg:
-            self.page.dialog = ft.AlertDialog(
+            dlg = ft.AlertDialog(
                 title=ft.Text("Cross-World Overwrite Risk", color=ft.Colors.RED_400),
                 content=ft.Text(warning_msg),
                 actions=[
-                    ft.TextButton("Yes, Overwrite", on_click=do_upload, icon=ft.Icons.WARNING_AMBER_ROUNDED, style=ft.ButtonStyle(color=ft.Colors.RED_400)),
-                    ft.TextButton("Cancel", on_click=lambda _: self.set_dialog(False)),
+                    ft.TextButton("Yes, Overwrite", on_click=do_upload, style=ft.ButtonStyle(color=ft.Colors.RED_400)),
+                    ft.TextButton("Cancel", on_click=lambda _: self._close_dialog(dlg)),
                 ]
             )
-            self.page.dialog.open = True
-            self.page.update()
+            self._open_dialog(dlg)
         elif meta and meta.get("exists"):
-            self.page.dialog = ft.AlertDialog(
+            dlg = ft.AlertDialog(
                 title=ft.Text("Confirm Upload"),
                 content=ft.Text("This will replace the latest save on the server. Continue?"),
                 actions=[
                     ft.TextButton("Yes, Upload", on_click=do_upload),
-                    ft.TextButton("Cancel", on_click=lambda _: self.set_dialog(False)),
+                    ft.TextButton("Cancel", on_click=lambda _: self._close_dialog(dlg)),
                 ]
             )
-            self.page.dialog.open = True
-            self.page.update()
+            self._open_dialog(dlg)
         else:
             do_upload(None)
 
@@ -466,7 +489,7 @@ class SFTApp:
             _save_token(self.api.token)
             self.show_main_view()
         else:
-            self.page.show_snack_bar(ft.SnackBar(ft.Text("Login failed! Invalid token.", color=ft.Colors.RED_400)))
+            self._snack("Login failed! Invalid token.", ft.Colors.RED_400)
 
 def main(page: ft.Page):
     import re

@@ -68,9 +68,17 @@ def get_session_name(filepath):
             s = d[off:off + byte_len - 2].decode("utf-16-le", errors="replace")
             return s, off + byte_len
 
-        map_name, off = _read_fstring(raw, off)
-        _map_opts, off = _read_fstring(raw, off)
+        _map_name, off = _read_fstring(raw, off)
+        map_opts, off = _read_fstring(raw, off)
         session_name, off = _read_fstring(raw, off)
-        return session_name
+        # In SF 1.0 the human-readable name is in MapOptions as ?sessionName=XXX
+        import re as _re
+        m = _re.search(r'[?&]sessionName=([^?&]+)', map_opts)
+        if m:
+            return m.group(1)
+        # Fallback: if session_name looks clean (short, no URL params) use it
+        if session_name and len(session_name) < 64 and '?' not in session_name:
+            return session_name
+        return _map_name or ""
     except Exception:
         return ""

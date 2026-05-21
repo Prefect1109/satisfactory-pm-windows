@@ -48,7 +48,13 @@ jobs:
     - name: Notify Backend
       if: startsWith(github.ref, 'refs/tags/')
       run: |
-        curl -X POST https://satisfactory.kaffka.tech/api/admin/client/version `
-          -H "Content-Type: application/json" `
-          -H "x-admin-token: ${{ secrets.ADMIN_TOKEN }}" `
-          -d "{\"version\": \"${{ github.ref_name }}\", \"url\": \"https://github.com/Prefect1109/satisfactory-pm-windows/releases/download/${{ github.ref_name }}/SFT-Tracker-Setup.exe\", \"force_update\": false}"
+        $body = @{
+          version = "${{ github.ref_name }}"
+          url = "https://github.com/Prefect1109/satisfactory-pm-windows/releases/download/${{ github.ref_name }}/SFT-Tracker-Setup.exe"
+          force_update = $false
+        } | ConvertTo-Json
+        Invoke-RestMethod -Uri "https://satisfactory.kaffka.tech/api/admin/client/version" `
+          -Method POST `
+          -ContentType "application/json" `
+          -Headers @{ "x-admin-token" = "${{ secrets.ADMIN_TOKEN }}" } `
+          -Body $body

@@ -55,8 +55,9 @@ jobs:
     - name: Notify Backend
       if: startsWith(github.ref, 'refs/tags/')
       run: |
+        $ver = "${{ github.ref_name }}" -replace '^v', ''
         $body = @{
-          version = "${{ github.ref_name }}"
+          version = $ver
           url = "https://github.com/Prefect1109/satisfactory-pm-windows/releases/download/${{ github.ref_name }}/SFT-Tracker-Setup.exe"
           force_update = $false
         } | ConvertTo-Json

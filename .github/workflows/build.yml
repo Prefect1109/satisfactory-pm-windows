@@ -27,9 +27,8 @@ jobs:
         pyinstaller --noconsole --onedir --name main main.py
         
     - name: Build Installer (Inno Setup)
-      uses: aybe/iscc-action@v2
-      with:
-        filepath: setup.iss
+      run: |
+        iscc setup.iss
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4

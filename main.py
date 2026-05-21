@@ -169,11 +169,20 @@ class SFTApp:
             return
         self.api.token = saved_token
         self.api.session.headers.update({"Authorization": f"Bearer {saved_token}"})
-        with ThreadPoolExecutor(max_workers=2) as ex:
-            me_f = ex.submit(self.api.get_me)
-            worlds_f = ex.submit(self.api.get_worlds)
-            me = me_f.result()
-            worlds = worlds_f.result()
+        try:
+            with ThreadPoolExecutor(max_workers=2) as ex:
+                me_f = ex.submit(self.api.get_me)
+                worlds_f = ex.submit(self.api.get_worlds)
+                me = me_f.result(timeout=8)
+                worlds = worlds_f.result(timeout=8)
+        except Exception:
+            self._open_dialog(ft.AlertDialog(
+                title=ft.Text("No Connection", color=ft.Colors.RED_400),
+                content=ft.Text("Cannot reach the server. Check your internet connection."),
+                actions=[ft.TextButton("OK", on_click=lambda _: self._close_dialog())],
+            ))
+            self.show_login_view()
+            return
         if not me:
             self.show_login_view()
             return
@@ -246,10 +255,15 @@ class SFTApp:
         if worlds is None:
             worlds = self.api.get_worlds() or []
         world_options = [ft.dropdown.Option(key=str(w["id"]), text=w["name"]) for w in worlds]
-        
+
+        last_world = _load_last_world()
+        valid_ids = {str(w["id"]) for w in worlds}
+        preselect = last_world if last_world in valid_ids else (str(worlds[0]["id"]) if worlds else None)
+
         self.world_dropdown = ft.Dropdown(
             label="Select World",
             options=world_options,
+            value=preselect,
             width=400,
             border_color=ft.Colors.ORANGE_500,
         )

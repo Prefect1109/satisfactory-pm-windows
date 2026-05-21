@@ -290,16 +290,19 @@ class SFTApp:
             self.page.show_snack_bar(ft.SnackBar(ft.Text("Login failed! Invalid token.")))
 
 def main(page: ft.Page):
+    import re
     app = SFTApp(page)
 
     # Check for token in command line args (deeplink)
     # sft://auth?token=XXX -> sys.argv might contain this or just part of it
     for arg in sys.argv:
         if "sft://auth?token=" in arg:
-            token = arg.split("token=")[-1]
-            app.handle_deeplink(token)
+            token = arg.split("token=")[-1].strip()
+            # Security: Validate token format (alphanumeric, reasonable length)
+            if re.match(r"^[A-Za-z0-9\-_]{16,128}$", token):
+                app.handle_deeplink(token)
+            else:
+                print("Invalid token format in deeplink.")
 
 if __name__ == "__main__":
-    ft.app(target=main)
-:
     ft.app(target=main)

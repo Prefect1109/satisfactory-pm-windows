@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http;
 using System.Reflection;
 using System.Windows;
 
@@ -21,7 +22,7 @@ public static class UpdateService
             var exeDir = Path.GetDirectoryName(Environment.ProcessPath)!;
             var tmpPath = Path.Combine(exeDir, "SFTracker_new.exe");
 
-            using var http = new System.Net.Http.HttpClient();
+            using var http = new HttpClient();
             using var resp = await http.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
             resp.EnsureSuccessStatusCode();
 

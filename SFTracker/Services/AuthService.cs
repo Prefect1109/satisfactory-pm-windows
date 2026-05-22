@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace SFTracker.Services;
 
 public static class AuthService

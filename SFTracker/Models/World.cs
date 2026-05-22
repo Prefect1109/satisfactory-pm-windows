@@ -22,8 +22,8 @@ public class World
 
 public class SaveMetadata
 {
-    [JsonPropertyName("world_id")]
-    public int WorldId { get; set; }
+    [JsonPropertyName("exists")]
+    public bool Exists { get; set; }
 
     [JsonPropertyName("filename")]
     public string? Filename { get; set; }
@@ -31,14 +31,17 @@ public class SaveMetadata
     [JsonPropertyName("size")]
     public long Size { get; set; }
 
-    [JsonPropertyName("md5")]
-    public string? Md5 { get; set; }
+    [JsonPropertyName("hash")]
+    public string? Hash { get; set; }
 
-    [JsonPropertyName("uploaded_at")]
-    public string? UploadedAt { get; set; }
+    [JsonPropertyName("session_name")]
+    public string? SessionName { get; set; }
 
-    [JsonPropertyName("uploaded_by")]
-    public string? UploadedBy { get; set; }
+    [JsonPropertyName("play_time_sec")]
+    public int PlayTimeSec { get; set; }
+
+    [JsonPropertyName("updated_at")]
+    public string? UpdatedAt { get; set; }
 }
 
 public class UserInfo

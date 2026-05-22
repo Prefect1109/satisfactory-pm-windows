@@ -128,47 +128,83 @@ public class MainViewModel : ViewModelBase
         var f = FindBestLocalSave(SelectedWorld?.Name);
         if (f == null) { LocalSaveInfo = "Сейвів немає"; return; }
         var tag = f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase) ? " [auto]" : "";
-        LocalSaveInfo = $"{f.Name}{tag}\n{f.Length / 1024} KB · {f.LastWriteTime:dd.MM HH:mm}";
+        var pt = FormatPlayTime(SaveParser.ReadPlayTimeSec(f.FullName));
+        LocalSaveInfo = $"{f.Name}{tag}\n{f.Length / 1024} KB · {pt}\n{f.LastWriteTime:dd.MM HH:mm}";
     }
 
     private void UpdateCloudInfo()
     {
-        if (CloudMeta == null) { CloudSaveInfo = "Порожньо"; return; }
-        var date = CloudMeta.UploadedAt?.Length >= 16 ? CloudMeta.UploadedAt[..16].Replace("T", " ") : CloudMeta.UploadedAt;
-        CloudSaveInfo = $"{CloudMeta.Filename}\n{CloudMeta.Size / 1024} KB · {date}";
+        if (CloudMeta == null || !CloudMeta.Exists) { CloudSaveInfo = "Порожньо"; return; }
+        var date = CloudMeta.UpdatedAt?.Replace("T", " ") ?? "";
+        var pt = FormatPlayTime(CloudMeta.PlayTimeSec);
+        CloudSaveInfo = $"{CloudMeta.SessionName ?? CloudMeta.Filename}\n{CloudMeta.Size / 1024} KB · {pt}\n{date}";
     }
 
     private void UpdateSyncDirection()
     {
         var local = FindBestLocalSave(SelectedWorld?.Name);
-        if (local == null || CloudMeta == null) { SyncDirection = "⇅ Sync"; return; }
+        if (local == null) { SyncDirection = "↓ Sync"; return; }
+        if (CloudMeta == null || !CloudMeta.Exists) { SyncDirection = "↑ Sync"; return; }
 
-        if (!DateTime.TryParse(CloudMeta.UploadedAt, out var cloudDate))
-        { SyncDirection = "⇅ Sync"; return; }
-
-        SyncDirection = local.LastWriteTime > cloudDate ? "↑ Sync" : "↓ Sync";
+        var (cmp, _) = ComparePlayTime(local, CloudMeta);
+        SyncDirection = cmp > 0 ? "↑ Sync" : cmp < 0 ? "↓ Sync" : "✓ Sync";
     }
 
-    // Smart sync: новіший перемагає
+    // Smart sync по play time — найбільше награного часу перемагає
     private async Task SyncAsync()
     {
         var local = FindBestLocalSave(SelectedWorld?.Name);
 
-        if (local == null && CloudMeta == null)
-        { StatusText = "Немає ні локального, ні хмарного сейву"; return; }
+        if (local == null && (CloudMeta == null || !CloudMeta.Exists))
+        { StatusText = "Немає сейвів ні локально, ні в хмарі"; return; }
 
         if (local == null) { await DownloadAsync(); return; }
-        if (CloudMeta == null) { await UploadAsync(); return; }
+        if (CloudMeta == null || !CloudMeta.Exists) { await UploadAsync(); return; }
 
-        if (!DateTime.TryParse(CloudMeta.UploadedAt, out var cloudDate))
-        { await UploadAsync(); return; }
+        var (cmp, reason) = ComparePlayTime(local, CloudMeta);
+        StatusText = reason;
 
-        if (local.LastWriteTime > cloudDate)
+        if (cmp > 0)
             await UploadAsync();
-        else if (cloudDate > local.LastWriteTime)
+        else if (cmp < 0)
             await DownloadAsync();
         else
             StatusText = "Вже синхронізовано ✓";
+    }
+
+    // Повертає (1 = local новіший, -1 = cloud новіший, 0 = однаково) + опис причини
+    private static (int, string) ComparePlayTime(FileInfo local, SaveMetadata cloud)
+    {
+        var localPt = SaveParser.ReadPlayTimeSec(local.FullName);
+        var cloudPt = cloud.PlayTimeSec;
+
+        // Обидва мають play time — порівнюємо
+        if (localPt > 0 && cloudPt > 0)
+        {
+            if (localPt > cloudPt)
+                return (1, $"Локальний +{FormatPlayTime(localPt - cloudPt)} більше награного часу");
+            if (cloudPt > localPt)
+                return (-1, $"Хмарний +{FormatPlayTime(cloudPt - localPt)} більше награного часу");
+            return (0, $"Однаковий play time: {FormatPlayTime(localPt)}");
+        }
+
+        // Fallback на дату якщо play time недоступний (dedicated server header = 0)
+        if (!DateTime.TryParse(cloud.UpdatedAt, out var cloudDate))
+            return (1, "Fallback: хмара без дати → upload");
+
+        if (local.LastWriteTime > cloudDate)
+            return (1, "Fallback: локальний новіший за датою");
+        if (cloudDate > local.LastWriteTime)
+            return (-1, "Fallback: хмарний новіший за датою");
+        return (0, "Однаково");
+    }
+
+    private static string FormatPlayTime(int sec)
+    {
+        if (sec <= 0) return "—";
+        var h = sec / 3600;
+        var m = (sec % 3600) / 60;
+        return h > 0 ? $"{h}г {m}хв" : $"{m}хв";
     }
 
     private async Task UploadAsync()

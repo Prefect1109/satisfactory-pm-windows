@@ -1,4 +1,0 @@
-flet
-requests
-python-dotenv
-psutil

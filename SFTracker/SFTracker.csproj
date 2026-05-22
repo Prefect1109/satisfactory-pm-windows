@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>SFTracker</AssemblyName>
+    <RootNamespace>SFTracker</RootNamespace>
+    <ApplicationIcon>..\assets\icon.ico</ApplicationIcon>
+    <Version>1.3.0</Version>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="..\assets\icon.ico" Link="Assets\icon.ico" />
+  </ItemGroup>
+
+</Project>

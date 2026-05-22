@@ -1,10 +1,12 @@
-venv/
-.venv/
-__pycache__/
-*.pyc
-build/
+# .NET
+bin/
+obj/
 dist/
-*.spec
-.env
-.idea/
-.vscode/
+*.user
+.vs/
+*.suo
+*.rsuser
+
+# Temp update files
+SFTracker_new.exe
+sft_update.ps1

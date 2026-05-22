@@ -1,13 +1,30 @@
 # SFT Windows — Release Guidelines
 
-## Incremental Releases
-This project follows an incremental release model to ensure steady progress.
+## Stack
+C# WPF, .NET 8, self-contained single-file exe (win-x64). Проект: `SFTracker/SFTracker.csproj`.
 
-- **Versioning**: Always increment the version in `main.py` for every change.
-- **Git Tags**: Every push to `main` must be tagged with the corresponding version (e.g., `v1.2.2`).
-- **Automation**: New tags trigger the build workflow to produce a fresh `.exe`.
+## Структура
+```
+SFTracker/
+├── Services/     ApiService, AuthService, UpdateService
+├── ViewModels/   MVVM: LoginViewModel, MainViewModel
+├── Views/        MainWindow, LoginView, MainPage, UpdateWindow
+├── Models/       World, SaveMetadata, UserInfo, VersionInfo
+└── Converters/   BoolToVisibility, NotEmptyToVisibility
+```
+
+## Incremental Releases
+- Версія живе в `<Version>` в `.csproj`.
+- Кожен push тегу `v*` → GitHub Actions → `dotnet publish` → single exe → GitHub Release → нотифікація бекенду.
+- Бекенд: `https://satisfactory.kaffka.tech/api`, ендпоінт версії: `GET /client/version`.
+
+## Auto-Update Flow
+App start → GET /client/version → якщо newer:
+- `force_update=true` → тихо качає, запускає ps1 updater, закривається
+- `force_update=false` → питає юзера
+
+Updater: PowerShell скрипт у temp, замінює `SFTracker.exe` поки app закритий, перезапускає.
 
 ## UI Standards
-- **Theme**: Dark Mode.
-- **Visuals**: Glassmorphism with semi-transparent containers and blurring.
-- **Components**: Rounded icons and clear visual feedback for sync states.
+- Dark glassmorphism, 460×700px, borderless, draggable titlebar.
+- Кольори: accent `#FF6B35`, surface `#1A1A2E`, card `#16213E`.

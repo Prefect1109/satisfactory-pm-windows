@@ -1,0 +1,49 @@
+<Page x:Class="SFTracker.Views.LoginView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="Transparent"
+      Title="Login">
+
+    <Grid>
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="340">
+
+            <!-- Logo / Title -->
+            <TextBlock Text="⚙" FontSize="48" HorizontalAlignment="Center"
+                       Foreground="{StaticResource AccentBrush}" Margin="0,0,0,8"/>
+            <TextBlock Text="Satisfactory Tracker" FontSize="22" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+            <TextBlock Text="Введи токен з бота /connect"
+                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
+                       HorizontalAlignment="Center" Margin="0,4,0,32"/>
+
+            <!-- Token input card -->
+            <Border Style="{StaticResource GlassCard}">
+                <StackPanel>
+                    <TextBlock Text="Connect Token" Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="12" Margin="0,0,0,6"/>
+                    <TextBox x:Name="TokenBox"
+                             Text="{Binding ConnectToken, UpdateSourceTrigger=PropertyChanged}"
+                             Tag="sft_xxxxxxxxxxxx"
+                             KeyDown="TokenBox_KeyDown"/>
+
+                    <!-- Error -->
+                    <TextBlock Text="{Binding ErrorText}"
+                               Foreground="#FF5555" FontSize="12"
+                               Margin="0,8,0,0"
+                               Visibility="{Binding ErrorText, Converter={StaticResource NotEmptyToVisibility}}"/>
+
+                    <Button Content="Увійти"
+                            Command="{Binding LoginCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            Margin="0,16,0,0"
+                            HorizontalAlignment="Stretch"/>
+
+                    <!-- Loading -->
+                    <ProgressBar IsIndeterminate="True" Margin="0,12,0,0"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </Grid>
+</Page>

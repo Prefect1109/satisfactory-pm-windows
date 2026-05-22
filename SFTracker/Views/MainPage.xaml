@@ -44,7 +44,7 @@
         <Border Grid.Row="1" Style="{StaticResource GlassCard}" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="СВІТ" Foreground="{StaticResource TextSecondaryBrush}"
-                           FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8" LetterSpacing="1"/>
+                           FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8"/>
                 <ComboBox ItemsSource="{Binding Worlds}"
                           SelectedItem="{Binding SelectedWorld}"
                           DisplayMemberPath="Name"/>
@@ -64,7 +64,7 @@
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <Ellipse Width="6" Height="6" Fill="#44FF6B35" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="ЛОКАЛЬНО" FontSize="10" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextSecondaryBrush}" LetterSpacing="1"/>
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
                     </StackPanel>
                     <TextBlock Text="{Binding LocalSaveInfo}" Foreground="{StaticResource TextPrimaryBrush}"
                                FontSize="12" TextWrapping="Wrap" LineHeight="18"/>
@@ -76,7 +76,7 @@
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <Ellipse Width="6" Height="6" Fill="#4400BFFF" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="ХМАРА" FontSize="10" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextSecondaryBrush}" LetterSpacing="1"/>
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
                     </StackPanel>
                     <TextBlock Text="{Binding CloudSaveInfo}" Foreground="{StaticResource TextPrimaryBrush}"
                                FontSize="12" TextWrapping="Wrap" LineHeight="18"/>

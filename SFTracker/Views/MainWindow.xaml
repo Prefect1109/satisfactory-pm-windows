@@ -39,7 +39,7 @@
                         </Ellipse.Fill>
                     </Ellipse>
                     <TextBlock Text="SF TRACKER" Foreground="#66FFFFFF"
-                               FontSize="11" FontWeight="SemiBold" LetterSpacing="2"
+                               FontSize="11" FontWeight="SemiBold"
                                VerticalAlignment="Center"/>
                 </StackPanel>
                 <!-- Window controls -->

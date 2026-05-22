@@ -4,108 +4,123 @@
       Background="Transparent"
       Title="Main">
 
-    <Grid Margin="16">
+    <Grid Margin="16,8,16,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header: user info -->
-        <Border Grid.Row="0" Style="{StaticResource GlassCard}" Margin="0,0,0,10">
+        <!-- Header -->
+        <Border Grid.Row="0" Style="{StaticResource GlassCard}" Margin="0,0,0,8">
             <Grid>
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding Username}" FontSize="16" FontWeight="SemiBold"
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Username}" FontSize="15" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}"/>
                         <Border Background="{StaticResource AccentBrush}" CornerRadius="4"
-                                Padding="6,2" Margin="8,0,0,0"
+                                Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding IsPremium, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="PREMIUM" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="PRO" FontSize="9" FontWeight="Bold" Foreground="White"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock Text="{Binding StorageInfo}" FontSize="12"
+                    <TextBlock Text="{Binding StorageInfo}" FontSize="11"
                                Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="📁" Style="{StaticResource SecondaryButton}" Padding="8,6"
-                            Command="{Binding OpenSaveFolderCommand}" ToolTip="Відкрити папку сейвів"
-                            Margin="0,0,6,0"/>
-                    <Button Content="↺" Style="{StaticResource SecondaryButton}" Padding="8,6"
-                            Command="{Binding RefreshCommand}" ToolTip="Оновити"/>
-                    <Button Content="Вийти" Style="{StaticResource SecondaryButton}"
-                            Command="{Binding LogoutCommand}" Margin="6,0,0,0"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Style="{StaticResource IconButton}" Command="{Binding OpenSaveFolderCommand}"
+                            ToolTip="Відкрити папку сейвів">📁</Button>
+                    <Button Style="{StaticResource IconButton}" Command="{Binding RefreshCommand}"
+                            ToolTip="Оновити" Margin="4,0,0,0">↺</Button>
+                    <Button Style="{StaticResource IconButton}" Command="{Binding LogoutCommand}"
+                            ToolTip="Вийти" Margin="4,0,0,0">⏻</Button>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- World selector -->
-        <Border Grid.Row="1" Style="{StaticResource GlassCard}" Margin="0,0,0,10">
+        <Border Grid.Row="1" Style="{StaticResource GlassCard}" Margin="0,0,0,8">
             <StackPanel>
-                <TextBlock Text="Світ" Foreground="{StaticResource TextSecondaryBrush}"
-                           FontSize="12" Margin="0,0,0,6"/>
+                <TextBlock Text="СВІТ" Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="10" FontWeight="SemiBold" Margin="0,0,0,8" LetterSpacing="1"/>
                 <ComboBox ItemsSource="{Binding Worlds}"
                           SelectedItem="{Binding SelectedWorld}"
                           DisplayMemberPath="Name"/>
             </StackPanel>
         </Border>
 
-        <!-- Sync info -->
-        <Border Grid.Row="2" Style="{StaticResource GlassCard}" Margin="0,0,0,10">
+        <!-- Save info: Local vs Cloud -->
+        <Border Grid.Row="2" Style="{StaticResource GlassCard}" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Local -->
-                <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                    <TextBlock Text="💾 Локально" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Ellipse Width="6" Height="6" Fill="#44FF6B35" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="ЛОКАЛЬНО" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextSecondaryBrush}" LetterSpacing="1"/>
+                    </StackPanel>
                     <TextBlock Text="{Binding LocalSaveInfo}" Foreground="{StaticResource TextPrimaryBrush}"
-                               FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                               FontSize="12" TextWrapping="Wrap" LineHeight="18"/>
                 </StackPanel>
 
-                <!-- Cloud -->
-                <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                    <TextBlock Text="☁ Хмара" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
-                    <TextBlock Text="{Binding SyncStatus}" Foreground="{StaticResource TextPrimaryBrush}"
-                               FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                <Rectangle Grid.Column="1" Fill="#22FFFFFF" Width="1"/>
+
+                <StackPanel Grid.Column="2" Margin="12,0,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Ellipse Width="6" Height="6" Fill="#4400BFFF" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="ХМАРА" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextSecondaryBrush}" LetterSpacing="1"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding CloudSaveInfo}" Foreground="{StaticResource TextPrimaryBrush}"
+                               FontSize="12" TextWrapping="Wrap" LineHeight="18"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Sync actions -->
-        <Border Grid.Row="3" Style="{StaticResource GlassCard}" Margin="0,0,0,10">
+        <!-- Sync button -->
+        <Border Grid.Row="3" Style="{StaticResource GlassCard}" Margin="0,0,0,8">
             <StackPanel>
-                <Grid Margin="0,0,0,12">
+                <!-- Big Sync -->
+                <Button Content="{Binding SyncDirection}"
+                        Command="{Binding SyncCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        FontSize="15" Padding="0,14"
+                        HorizontalAlignment="Stretch"/>
+
+                <!-- Progress -->
+                <ProgressBar Value="{Binding Progress}" Maximum="100" Margin="0,10,0,0"
+                             Visibility="{Binding ProgressVisible, Converter={StaticResource BoolToVisibility}}"/>
+
+                <!-- Manual override -->
+                <Grid Margin="0,10,0,0"
+                      Visibility="{Binding IsNotBusy, Converter={StaticResource BoolToVisibility}}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-
-                    <Button Grid.Column="0" Content="⬆ Upload" Style="{StaticResource PrimaryButton}"
-                            Command="{Binding UploadCommand}" Margin="0,0,6,0"/>
-                    <Button Grid.Column="1" Content="⬇ Download" Style="{StaticResource SecondaryButton}"
-                            Command="{Binding DownloadCommand}" Margin="6,0,0,0"/>
+                    <Button Grid.Column="0" Content="↑ Upload" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding UploadCommand}" Margin="0,0,4,0" FontSize="12"/>
+                    <Button Grid.Column="1" Content="↓ Download" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding DownloadCommand}" Margin="4,0,0,0" FontSize="12"/>
                 </Grid>
-
-                <!-- Progress -->
-                <ProgressBar Value="{Binding Progress}" Maximum="100"
-                             Visibility="{Binding ProgressVisible, Converter={StaticResource BoolToVisibility}}"/>
             </StackPanel>
         </Border>
 
-        <!-- Status bar -->
-        <Border Grid.Row="4" Padding="0,4,0,0">
+        <!-- Status -->
+        <Border Grid.Row="4" VerticalAlignment="Bottom" Padding="0,4,0,0">
             <StackPanel>
-                <ProgressBar IsIndeterminate="True"
-                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
-                             Margin="0,0,0,6"/>
-                <TextBlock Text="{Binding StatusText}"
+                <ProgressBar IsIndeterminate="True" Margin="0,0,0,6"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"/>
+                <TextBlock Text="{Binding StatusText}" FontSize="12"
                            Foreground="{StaticResource TextSecondaryBrush}"
-                           FontSize="12" HorizontalAlignment="Center"/>
+                           HorizontalAlignment="Center" TextWrapping="Wrap"/>
             </StackPanel>
         </Border>
     </Grid>

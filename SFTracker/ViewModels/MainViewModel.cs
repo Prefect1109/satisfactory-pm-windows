@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
@@ -14,10 +15,11 @@ public class MainViewModel : ViewModelBase
     public MainViewModel(ApiService api)
     {
         _api = api;
-        UploadCommand = new RelayCommand(async _ => await UploadAsync(), _ => SelectedWorld != null && !IsBusy);
+        SyncCommand   = new RelayCommand(async _ => await SyncAsync(),     _ => SelectedWorld != null && !IsBusy);
+        UploadCommand = new RelayCommand(async _ => await UploadAsync(),   _ => SelectedWorld != null && !IsBusy);
         DownloadCommand = new RelayCommand(async _ => await DownloadAsync(), _ => SelectedWorld != null && !IsBusy);
         LogoutCommand = new RelayCommand(_ => Logout());
-        RefreshCommand = new RelayCommand(async _ => await RefreshAsync(), _ => !IsBusy);
+        RefreshCommand = new RelayCommand(async _ => await LoadAsync(), _ => !IsBusy);
         OpenSaveFolderCommand = new RelayCommand(_ => OpenSaveFolder());
     }
 
@@ -34,12 +36,7 @@ public class MainViewModel : ViewModelBase
     public bool IsBusy
     {
         get => _isBusy;
-        set
-        {
-            Set(ref _isBusy, value);
-            OnPropertyChanged(nameof(IsNotBusy));
-            CommandManager.InvalidateRequerySuggested();
-        }
+        set { Set(ref _isBusy, value); OnPropertyChanged(nameof(IsNotBusy)); CommandManager.InvalidateRequerySuggested(); }
     }
     public bool IsNotBusy => !_isBusy;
 
@@ -60,7 +57,7 @@ public class MainViewModel : ViewModelBase
         {
             if (Set(ref _selectedWorld, value))
             {
-                AuthService.SaveLastWorld(value?.Id ?? 0);
+                if (value != null) AuthService.SaveLastWorld(value.Id);
                 _ = LoadWorldMetaAsync();
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -68,16 +65,21 @@ public class MainViewModel : ViewModelBase
     }
 
     private SaveMetadata? _cloudMeta;
-    public SaveMetadata? CloudMeta { get => _cloudMeta; set => Set(ref _cloudMeta, value); }
+    public SaveMetadata? CloudMeta { get => _cloudMeta; set { Set(ref _cloudMeta, value); UpdateSyncDirection(); } }
 
     private string _localSaveInfo = "Не знайдено";
     public string LocalSaveInfo { get => _localSaveInfo; set => Set(ref _localSaveInfo, value); }
 
-    private string _syncStatus = "";
-    public string SyncStatus { get => _syncStatus; set => Set(ref _syncStatus, value); }
+    private string _cloudSaveInfo = "Порожньо";
+    public string CloudSaveInfo { get => _cloudSaveInfo; set => Set(ref _cloudSaveInfo, value); }
+
+    // "↑ Upload", "↓ Download", "✓ Sync"
+    private string _syncDirection = "⇅ Sync";
+    public string SyncDirection { get => _syncDirection; set => Set(ref _syncDirection, value); }
 
     public ObservableCollection<World> Worlds { get; } = [];
 
+    public ICommand SyncCommand { get; }
     public ICommand UploadCommand { get; }
     public ICommand DownloadCommand { get; }
     public ICommand LogoutCommand { get; }
@@ -97,7 +99,9 @@ public class MainViewModel : ViewModelBase
             {
                 Username = me.Username;
                 IsPremium = me.IsPremium;
-                StorageInfo = $"{me.StorageUsed / 1024 / 1024} MB / {me.StorageLimit / 1024 / 1024} MB";
+                var usedMb = me.StorageUsed / 1024 / 1024;
+                var limitMb = me.StorageLimit / 1024 / 1024;
+                StorageInfo = $"{usedMb} / {limitMb} MB";
             }
 
             var worlds = await _api.GetWorldsAsync();
@@ -106,66 +110,79 @@ public class MainViewModel : ViewModelBase
 
             var lastId = AuthService.LoadLastWorld();
             SelectedWorld = Worlds.FirstOrDefault(w => w.Id == lastId) ?? Worlds.FirstOrDefault();
-
             StatusText = "";
         }
         finally { IsBusy = false; }
-    }
-
-    private async Task RefreshAsync()
-    {
-        await LoadAsync();
     }
 
     private async Task LoadWorldMetaAsync()
     {
         if (SelectedWorld == null) return;
         CloudMeta = await _api.GetSaveMetadataAsync(SelectedWorld.Id);
-        UpdateLocalSaveInfo();
-        UpdateSyncStatus();
+        RefreshLocalInfo();
+        UpdateCloudInfo();
     }
 
-    private void UpdateLocalSaveInfo()
+    private void RefreshLocalInfo()
     {
-        var path = GetLocalSavePath();
-        if (path == null) { LocalSaveInfo = "Папку сейвів не знайдено"; return; }
-
-        var files = Directory.GetFiles(path, "*.sav")
-            .Select(f => new FileInfo(f))
-            .OrderByDescending(f => f.LastWriteTime)
-            .FirstOrDefault();
-
-        if (files == null) { LocalSaveInfo = "Сейвів немає"; return; }
-        LocalSaveInfo = $"{files.Name} ({files.Length / 1024} KB) · {files.LastWriteTime:dd.MM HH:mm}";
+        var f = FindBestLocalSave(SelectedWorld?.Name);
+        if (f == null) { LocalSaveInfo = "Сейвів немає"; return; }
+        var tag = f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase) ? " [auto]" : "";
+        LocalSaveInfo = $"{f.Name}{tag}\n{f.Length / 1024} KB · {f.LastWriteTime:dd.MM HH:mm}";
     }
 
-    private void UpdateSyncStatus()
+    private void UpdateCloudInfo()
     {
-        if (CloudMeta == null) { SyncStatus = "Хмара порожня"; return; }
-        SyncStatus = $"Хмара: {CloudMeta.Filename} · {CloudMeta.UploadedAt?[..16]}";
+        if (CloudMeta == null) { CloudSaveInfo = "Порожньо"; return; }
+        var date = CloudMeta.UploadedAt?.Length >= 16 ? CloudMeta.UploadedAt[..16].Replace("T", " ") : CloudMeta.UploadedAt;
+        CloudSaveInfo = $"{CloudMeta.Filename}\n{CloudMeta.Size / 1024} KB · {date}";
+    }
+
+    private void UpdateSyncDirection()
+    {
+        var local = FindBestLocalSave(SelectedWorld?.Name);
+        if (local == null || CloudMeta == null) { SyncDirection = "⇅ Sync"; return; }
+
+        if (!DateTime.TryParse(CloudMeta.UploadedAt, out var cloudDate))
+        { SyncDirection = "⇅ Sync"; return; }
+
+        SyncDirection = local.LastWriteTime > cloudDate ? "↑ Sync" : "↓ Sync";
+    }
+
+    // Smart sync: новіший перемагає
+    private async Task SyncAsync()
+    {
+        var local = FindBestLocalSave(SelectedWorld?.Name);
+
+        if (local == null && CloudMeta == null)
+        { StatusText = "Немає ні локального, ні хмарного сейву"; return; }
+
+        if (local == null) { await DownloadAsync(); return; }
+        if (CloudMeta == null) { await UploadAsync(); return; }
+
+        if (!DateTime.TryParse(CloudMeta.UploadedAt, out var cloudDate))
+        { await UploadAsync(); return; }
+
+        if (local.LastWriteTime > cloudDate)
+            await UploadAsync();
+        else if (cloudDate > local.LastWriteTime)
+            await DownloadAsync();
+        else
+            StatusText = "Вже синхронізовано ✓";
     }
 
     private async Task UploadAsync()
     {
-        var path = GetLocalSavePath();
-        if (path == null) { StatusText = "Папку сейвів не знайдено"; return; }
+        var f = FindBestLocalSave(SelectedWorld?.Name);
+        if (f == null) { StatusText = "Локальний сейв не знайдено"; return; }
 
-        var latest = Directory.GetFiles(path, "*.sav")
-            .Select(f => new FileInfo(f))
-            .OrderByDescending(f => f.LastWriteTime)
-            .FirstOrDefault();
-
-        if (latest == null) { StatusText = "Немає локального сейву"; return; }
-
-        IsBusy = true;
-        ProgressVisible = true;
-        Progress = 0;
-        StatusText = "Завантаження на сервер...";
+        IsBusy = true; ProgressVisible = true; Progress = 0;
+        StatusText = $"Upload: {f.Name}...";
         try
         {
-            var ok = await _api.UploadSaveAsync(SelectedWorld!.Id, latest.FullName,
-                new Progress<double>(p => { Progress = p * 100; }));
-            StatusText = ok ? "Завантажено!" : "Помилка завантаження";
+            var ok = await _api.UploadSaveAsync(SelectedWorld!.Id, f.FullName,
+                new Progress<double>(p => Progress = p * 100));
+            StatusText = ok ? "Завантажено на сервер ✓" : "Помилка upload";
             if (ok) await LoadWorldMetaAsync();
         }
         finally { IsBusy = false; ProgressVisible = false; }
@@ -173,19 +190,18 @@ public class MainViewModel : ViewModelBase
 
     private async Task DownloadAsync()
     {
-        var path = GetLocalSavePath();
-        if (path == null) { StatusText = "Папку сейвів не знайдено"; return; }
+        var dir = FindSavesDirectory();
+        if (dir == null) { StatusText = "Папку сейвів не знайдено"; return; }
 
-        IsBusy = true;
-        ProgressVisible = true;
-        Progress = 0;
-        StatusText = "Завантаження з сервера...";
+        IsBusy = true; ProgressVisible = true; Progress = 0;
+        StatusText = "Download з сервера...";
         try
         {
-            var result = await _api.DownloadSaveAsync(SelectedWorld!.Id, path,
-                new Progress<double>(p => { Progress = p * 100; }));
-            StatusText = result != null ? "Скачано!" : "Помилка скачування";
-            UpdateLocalSaveInfo();
+            var path = await _api.DownloadSaveAsync(SelectedWorld!.Id, dir,
+                new Progress<double>(p => Progress = p * 100));
+            StatusText = path != null ? "Скачано ✓" : "Помилка download";
+            RefreshLocalInfo();
+            UpdateSyncDirection();
         }
         finally { IsBusy = false; ProgressVisible = false; }
     }
@@ -199,20 +215,65 @@ public class MainViewModel : ViewModelBase
 
     private void OpenSaveFolder()
     {
-        var path = GetLocalSavePath();
-        if (path != null && Directory.Exists(path))
-            System.Diagnostics.Process.Start("explorer.exe", path);
+        var dir = FindSavesDirectory();
+        if (dir != null && Directory.Exists(dir))
+            Process.Start("explorer.exe", dir);
     }
 
-    private static string? GetLocalSavePath()
+    // Шукає найкращий сейв для цього світу:
+    // 1. Звичайний .sav з назвою світу
+    // 2. Autosave з назвою світу
+    // 3. Будь-який звичайний .sav
+    // 4. Будь-який autosave
+    private static FileInfo? FindBestLocalSave(string? worldName)
+    {
+        var all = GetAllSaveFiles();
+        if (all.Count == 0) return null;
+
+        bool IsAuto(FileInfo f) => f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase);
+        bool MatchesWorld(FileInfo f) => !string.IsNullOrEmpty(worldName) &&
+            f.Name.Contains(worldName, StringComparison.OrdinalIgnoreCase);
+
+        return all.Where(f => !IsAuto(f) && MatchesWorld(f)).MaxBy(f => f.LastWriteTime)
+            ?? all.Where(f =>  IsAuto(f) && MatchesWorld(f)).MaxBy(f => f.LastWriteTime)
+            ?? all.Where(f => !IsAuto(f)).MaxBy(f => f.LastWriteTime)
+            ?? all.MaxBy(f => f.LastWriteTime);
+    }
+
+    // Папка для download — та де вже є сейви, або перша підпапка SaveGames
+    private static string? FindSavesDirectory()
+    {
+        var root = GetSaveGamesRoot();
+        if (root == null) return null;
+
+        // Папка з найновішим .sav
+        var best = Directory.EnumerateDirectories(root)
+            .Append(root)
+            .Where(d => Directory.EnumerateFiles(d, "*.sav").Any())
+            .OrderByDescending(d => Directory.EnumerateFiles(d, "*.sav")
+                .Select(f => new FileInfo(f).LastWriteTime).DefaultIfEmpty().Max())
+            .FirstOrDefault();
+
+        return best ?? Directory.EnumerateDirectories(root).FirstOrDefault() ?? root;
+    }
+
+    private static List<FileInfo> GetAllSaveFiles()
+    {
+        var root = GetSaveGamesRoot();
+        if (root == null) return [];
+
+        return Directory.EnumerateDirectories(root)
+            .Append(root)
+            .Where(Directory.Exists)
+            .SelectMany(d => Directory.EnumerateFiles(d, "*.sav"))
+            .Select(f => new FileInfo(f))
+            .ToList();
+    }
+
+    private static string? GetSaveGamesRoot()
     {
         var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var path = Path.Combine(local, "FactoryGame", "Saved", "SaveGames", "common");
-        if (Directory.Exists(path)) return path;
-
-        // fallback — старий шлях
-        var appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        path = Path.Combine(appdata, "..", "Local", "FactoryGame", "Saved", "SaveGames");
+        var path = Path.Combine(local, "FactoryGame", "Saved", "SaveGames");
         return Directory.Exists(path) ? path : null;
     }
 }
@@ -240,10 +301,6 @@ public class RelayCommand(Func<object?, Task> executeAsync, Predicate<object?>? 
         _isRunning = true;
         CommandManager.InvalidateRequerySuggested();
         try { await _executeAsync(parameter); }
-        finally
-        {
-            _isRunning = false;
-            CommandManager.InvalidateRequerySuggested();
-        }
+        finally { _isRunning = false; CommandManager.InvalidateRequerySuggested(); }
     }
 }

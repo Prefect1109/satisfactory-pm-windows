@@ -1,17 +1,31 @@
-# Satisfactory Session Tracker - Windows Companion
+# Satisfactory Session Tracker — Windows
 
-Desktop application for syncing Satisfactory saves with the [Satisfactory Tracker Bot](https://t.me/SatisfactoryTrackerBot).
+Desktop companion для синхронізації сейвів Satisfactory через [Satisfactory Tracker Bot](https://t.me/SatisfactoryTrackerBot).
 
-## Features
-- Auto-detects Steam/Epic save folder
-- One-click Download/Upload saves
-- Deep-link login from Telegram
-- Auto-updates
+## Можливості
 
-## Development
-1. Install Python 3.12+
-2. `pip install -r requirements.txt`
-3. `flet run main.py`
+- **Smart Sync** — порівнює дати локального і хмарного сейву, завантажує новіший
+- **Auto-detect** — знаходить папку сейвів автоматично (Steam, Epic, будь-який account ID)
+- **Autosave fallback** — якщо звичайного сейву нема, підхоплює autosave по назві світу
+- **Auto-update** — при запуску перевіряє нову версію і оновлюється без ручних дій
+- **Зберігає токен** — повторний логін після оновлення не потрібен
+
+## Як почати
+
+1. Отримай токен у боті: `/connect`
+2. Завантаж `SFT-Tracker-Setup.exe` з [Releases](../../releases/latest)
+3. Запусти, введи токен — готово
+
+## Стек
+
+C# WPF · .NET 8 · self-contained single `.exe` (не потребує встановленого .NET)
 
 ## Build
-The app is built automatically via GitHub Actions.
+
+Збирається автоматично через GitHub Actions при пуші тегу `v*`:
+
+```
+git tag v1.x.x && git push origin v1.x.x
+```
+
+Версія бампиться автоматично з тегу → `dotnet publish` → GitHub Release → бекенд нотифікується.

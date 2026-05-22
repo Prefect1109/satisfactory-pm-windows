@@ -246,15 +246,17 @@ public class MainViewModel : ViewModelBase
         var root = GetSaveGamesRoot();
         if (root == null) return null;
 
-        // Папка з найновішим .sav
-        var best = Directory.EnumerateDirectories(root)
-            .Append(root)
+        // Тільки підпапки — ніколи не сам SaveGames root
+        var subdirs = Directory.EnumerateDirectories(root).ToList();
+
+        // Підпапка де є будь-який .sav (включно з autosave) — найновіший
+        var best = subdirs
             .Where(d => Directory.EnumerateFiles(d, "*.sav").Any())
             .OrderByDescending(d => Directory.EnumerateFiles(d, "*.sav")
                 .Select(f => new FileInfo(f).LastWriteTime).DefaultIfEmpty().Max())
             .FirstOrDefault();
 
-        return best ?? Directory.EnumerateDirectories(root).FirstOrDefault() ?? root;
+        return best ?? subdirs.FirstOrDefault();
     }
 
     private static List<FileInfo> GetAllSaveFiles()
@@ -263,8 +265,6 @@ public class MainViewModel : ViewModelBase
         if (root == null) return [];
 
         return Directory.EnumerateDirectories(root)
-            .Append(root)
-            .Where(Directory.Exists)
             .SelectMany(d => Directory.EnumerateFiles(d, "*.sav"))
             .Select(f => new FileInfo(f))
             .ToList();

@@ -244,47 +244,64 @@ public class MainViewModel : ViewModelBase
     {
         var local = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
         if (local == null) { StatusText = "Локальний сейв не знайдено"; return; }
-        var (_, reason) = CloudMeta?.Exists == true
-            ? ComparePlayTime(local, CloudMeta!)
-            : (1, "Хмара порожня");
-        if (!Confirm(true, local, reason)) return;
+
+        int cmp; string reason;
+        if (CloudMeta?.Exists == true)
+            (cmp, reason) = ComparePlayTime(local, CloudMeta!);
+        else
+            (cmp, reason) = (1, "Хмара порожня");
+
+        // cmp < 0 означає локальний СТАРІШИЙ — небезпечно
+        if (!Confirm(true, local, reason, risky: cmp < 0)) return;
         await UploadAsync();
     }
 
     private async Task ConfirmAndDownloadAsync()
     {
         var local = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
-        var (_, reason) = (local != null && CloudMeta?.Exists == true)
-            ? ComparePlayTime(local, CloudMeta!)
-            : (-1, "Локального сейву немає");
-        if (!Confirm(false, local, reason)) return;
+
+        int cmp; string reason;
+        if (local != null && CloudMeta?.Exists == true)
+            (cmp, reason) = ComparePlayTime(local, CloudMeta!);
+        else
+            (cmp, reason) = (-1, "Локального сейву немає");
+
+        // cmp > 0 означає хмарний СТАРІШИЙ — небезпечно
+        if (!Confirm(false, local, reason, risky: cmp > 0)) return;
         await DownloadAsync();
     }
 
-    private bool Confirm(bool isUpload, FileInfo? local, string reason)
+    private bool Confirm(bool isUpload, FileInfo? local, string reason, bool risky = false)
     {
-        if (SkipConfirm) return true;
+        if (SkipConfirm && !risky) return true; // skip_confirm не діє на небезпечні операції
 
-        var localPt  = local != null ? FormatPlayTime(SaveParser.ReadPlayTimeSec(local.FullName)) : "—";
-        var cloudPt  = CloudMeta?.Exists == true ? FormatPlayTime(CloudMeta.PlayTimeSec) : "—";
+        var localPt   = local != null ? FormatPlayTime(SaveParser.ReadPlayTimeSec(local.FullName)) : "—";
+        var cloudPt   = CloudMeta?.Exists == true ? FormatPlayTime(CloudMeta.PlayTimeSec) : "—";
         var worldName = SelectedWorld?.Name ?? "";
 
         string action, what, overwriting;
         if (isUpload)
         {
-            action     = "⬆ UPLOAD";
-            what       = $"Локальний сейв ({localPt} награно)\n→ перезапише хмарний ({cloudPt})";
+            action      = "⬆ UPLOAD";
+            what        = $"Локальний сейв ({localPt} награно)\n→ перезапише хмарний ({cloudPt})";
             overwriting = "Хмарний сейв буде перезаписано.";
         }
         else
         {
-            action     = "⬇ DOWNLOAD";
-            what       = $"Хмарний сейв ({cloudPt} награно)\n→ перезапише локальний ({localPt})";
+            action      = "⬇ DOWNLOAD";
+            what        = $"Хмарний сейв ({cloudPt} награно)\n→ перезапише локальний ({localPt})";
             overwriting = $"Буде записано як {MakeSaveName("manual")}";
         }
 
-        var msg = $"[{worldName}] {action}\n\n{what}\n\n{reason}\n\n{overwriting}";
-        var result = MessageBox.Show(msg, "Підтвердження", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+        string warning = risky
+            ? "⚠ УВАГА: ти перезаписуєш НОВІШИЙ сейв СТАРІШИМ!\nПрогрес буде втрачено.\n\n"
+            : "";
+
+        var title = risky ? "⚠ Небезпечна операція" : "Підтвердження";
+        var icon  = risky ? MessageBoxImage.Warning : MessageBoxImage.Question;
+
+        var msg = $"{warning}[{worldName}] {action}\n\n{what}\n\n{reason}\n\n{overwriting}";
+        var result = MessageBox.Show(msg, title, MessageBoxButton.OKCancel, icon);
         return result == MessageBoxResult.OK;
     }
 

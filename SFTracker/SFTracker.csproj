@@ -7,7 +7,7 @@
     <AssemblyName>SFTracker</AssemblyName>
     <RootNamespace>SFTracker</RootNamespace>
     <ApplicationIcon>..\assets\icon.ico</ApplicationIcon>
-    <Version>1.3.8</Version>
+    <Version>1.3.9</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>

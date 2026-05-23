@@ -280,7 +280,7 @@ public class MainViewModel : ViewModelBase
         {
             action     = "⬇ DOWNLOAD";
             what       = $"Хмарний сейв ({cloudPt} награно)\n→ перезапише локальний ({localPt})";
-            overwriting = $"Буде записано як {SelectedWorld?.Name}.sav";
+            overwriting = $"Буде записано як {MakeSaveName("manual")}";
         }
 
         var msg = $"[{worldName}] {action}\n\n{what}\n\n{reason}\n\n{overwriting}";
@@ -315,6 +315,15 @@ public class MainViewModel : ViewModelBase
         return (0, "Однаково");
     }
 
+    // {worldName}-{userName}-{yyyyMMdd-HHmm}-{manual|auto}.sav
+    private string MakeSaveName(string type)
+    {
+        var world = SelectedWorld?.Name ?? "world";
+        var user  = string.IsNullOrEmpty(Username) ? "user" : Username;
+        var dt    = DateTime.Now.ToString("yyyyMMdd-HHmm");
+        return $"{world}-{user}-{dt}-{type}.sav";
+    }
+
     private static string FormatPlayTime(int sec)
     {
         if (sec <= 0) return "—";
@@ -328,7 +337,7 @@ public class MainViewModel : ViewModelBase
         var f = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
         if (f == null) { StatusText = "Локальний сейв не знайдено"; return; }
 
-        var standardName = $"{SelectedWorld!.Name}.sav";
+        var standardName = MakeSaveName("manual");
         IsBusy = true; ProgressVisible = true; Progress = 0;
         StatusText = $"Upload: {standardName}...";
         try
@@ -346,8 +355,7 @@ public class MainViewModel : ViewModelBase
         var dir = FindSavesDirectory();
         if (dir == null) { StatusText = "Папку сейвів не знайдено"; return; }
 
-        // Завжди кладемо як WorldName.sav — перезаписуємо (качаємо тільки коли хмара новіша)
-        var targetPath = Path.Combine(dir, $"{SelectedWorld!.Name}.sav");
+        var targetPath = Path.Combine(dir, MakeSaveName("manual"));
         IsBusy = true; ProgressVisible = true; Progress = 0;
         StatusText = "Download з сервера...";
         try
@@ -391,7 +399,7 @@ public class MainViewModel : ViewModelBase
             try
             {
                 var ok = await _api.UploadSaveAsync(SelectedWorld.Id, recentSave.FullName,
-                    $"{SelectedWorld.Name}.sav",
+                    MakeSaveName("auto"),
                     new Progress<double>(p => Progress = p * 100));
                 StatusText = ok ? $"Автосинк ✓ ({FormatPlayTime(localPt)})" : "Автосинк: помилка завантаження";
                 if (ok) await LoadWorldMetaAsync();

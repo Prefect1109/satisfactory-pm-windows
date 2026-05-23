@@ -34,21 +34,21 @@ public static class AuthService
         try { File.Delete(TokenPath); } catch { }
     }
 
-    public static int? LoadLastWorld()
+    public static string? LoadLastWorld()
     {
         try
         {
             if (!File.Exists(LastWorldPath)) return null;
             var s = File.ReadAllText(LastWorldPath).Trim();
-            return int.TryParse(s, out var id) ? id : null;
+            return string.IsNullOrEmpty(s) ? null : s;
         }
         catch { return null; }
     }
 
-    public static void SaveLastWorld(int worldId)
+    public static void SaveLastWorld(string inviteCode)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(LastWorldPath)!);
-        File.WriteAllText(LastWorldPath, worldId.ToString());
+        File.WriteAllText(LastWorldPath, inviteCode);
     }
 
     private static readonly string SkipConfirmPath = Path.Combine(
@@ -97,5 +97,31 @@ public static class AuthService
     {
         Directory.CreateDirectory(Path.GetDirectoryName(AutoStartAskedPath)!);
         File.WriteAllText(AutoStartAskedPath, "1");
+    }
+
+    private static readonly string RefreshTokenPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SFTracker", "refresh_token.txt");
+
+    public static string? LoadRefreshToken()
+    {
+        try
+        {
+            if (!File.Exists(RefreshTokenPath)) return null;
+            var t = File.ReadAllText(RefreshTokenPath).Trim();
+            return string.IsNullOrEmpty(t) ? null : t;
+        }
+        catch { return null; }
+    }
+
+    public static void SaveRefreshToken(string token)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(RefreshTokenPath)!);
+        File.WriteAllText(RefreshTokenPath, token);
+    }
+
+    public static void ClearRefreshToken()
+    {
+        try { File.Delete(RefreshTokenPath); } catch { }
     }
 }

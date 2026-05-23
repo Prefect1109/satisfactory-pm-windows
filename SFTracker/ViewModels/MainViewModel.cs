@@ -122,7 +122,7 @@ public class MainViewModel : ViewModelBase
         {
             if (Set(ref _selectedWorld, value))
             {
-                if (value != null) AuthService.SaveLastWorld(value.Id);
+                if (value != null) AuthService.SaveLastWorld(value.InviteCode);
                 _ = LoadWorldMetaAsync();
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -173,8 +173,8 @@ public class MainViewModel : ViewModelBase
             Worlds.Clear();
             foreach (var w in worlds) Worlds.Add(w);
 
-            var lastId = AuthService.LoadLastWorld();
-            SelectedWorld = Worlds.FirstOrDefault(w => w.Id == lastId) ?? Worlds.FirstOrDefault();
+            var lastCode = AuthService.LoadLastWorld();
+            SelectedWorld = Worlds.FirstOrDefault(w => w.InviteCode == lastCode) ?? Worlds.FirstOrDefault();
             StatusText = "";
         }
         finally { IsBusy = false; }
@@ -183,7 +183,7 @@ public class MainViewModel : ViewModelBase
     private async Task LoadWorldMetaAsync()
     {
         if (SelectedWorld == null) return;
-        CloudMeta = await _api.GetSaveMetadataAsync(SelectedWorld.Id);
+        CloudMeta = await _api.GetSaveMetadataAsync(SelectedWorld.InviteCode);
         RefreshLocalInfo();
         UpdateCloudInfo();
     }
@@ -372,7 +372,7 @@ public class MainViewModel : ViewModelBase
         StatusText = $"Upload: {standardName}...";
         try
         {
-            var ok = await _api.UploadSaveAsync(SelectedWorld.Id, f.FullName, standardName,
+            var ok = await _api.UploadSaveAsync(SelectedWorld.InviteCode, f.FullName, standardName,
                 new Progress<double>(p => Progress = p * 100));
             StatusText = ok ? "Завантажено на сервер ✓" : "Помилка upload";
             if (ok) await LoadWorldMetaAsync();
@@ -390,7 +390,7 @@ public class MainViewModel : ViewModelBase
         StatusText = "Download з сервера...";
         try
         {
-            var path = await _api.DownloadSaveAsync(SelectedWorld.Id, targetPath,
+            var path = await _api.DownloadSaveAsync(SelectedWorld.InviteCode, targetPath,
                 new Progress<double>(p => Progress = p * 100));
             StatusText = path != null ? $"Скачано ✓ → {Path.GetFileName(path)}" : "Помилка download";
             RefreshLocalInfo();
@@ -428,7 +428,7 @@ public class MainViewModel : ViewModelBase
             StatusText = "Автосинк: завантаження...";
             try
             {
-                var ok = await _api.UploadSaveAsync(SelectedWorld.Id, recentSave.FullName,
+                var ok = await _api.UploadSaveAsync(SelectedWorld.InviteCode, recentSave.FullName,
                     MakeSaveName("auto"),
                     new Progress<double>(p => Progress = p * 100));
                 StatusText = ok ? $"Автосинк ✓ ({FormatPlayTime(localPt)})" : "Автосинк: помилка завантаження";
@@ -442,6 +442,7 @@ public class MainViewModel : ViewModelBase
     {
         DetachGameWatcher();
         AuthService.ClearToken();
+        AuthService.ClearRefreshToken();
         _api.ClearToken();
         LoggedOut?.Invoke();
     }

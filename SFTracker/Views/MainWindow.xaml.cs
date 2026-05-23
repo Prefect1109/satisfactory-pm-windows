@@ -55,6 +55,13 @@ public partial class MainWindow : Window
         vm.LoggedOut += NavigateToLogin;
         vm.AutoSyncChanged += OnAutoSyncChanged;
         vm.AttachGameWatcher(_gameWatcher);
+        _api.SessionExpired += () => Dispatcher.Invoke(() =>
+        {
+            AuthService.ClearToken();
+            AuthService.ClearRefreshToken();
+            _api.ClearToken();
+            NavigateToLogin();
+        });
         _currentVm = vm;
 
         var page = new MainPage(vm);

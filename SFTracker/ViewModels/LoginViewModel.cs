@@ -36,15 +36,17 @@ public class LoginViewModel : ViewModelBase
         ErrorText = "";
         try
         {
-            var token = await _api.LoginAsync(ConnectToken.Trim());
-            if (token == null)
+            var result = await _api.LoginAsync(ConnectToken.Trim());
+            if (result == null)
             {
                 ErrorText = "Невірний токен. Отримай його у боті /connect";
                 return;
             }
-            AuthService.SaveToken(token);
-            _api.SetToken(token);
-            LoginSucceeded?.Invoke(token);
+            var (session, refresh) = result.Value;
+            AuthService.SaveToken(session);
+            AuthService.SaveRefreshToken(refresh);
+            _api.SetToken(session);
+            LoginSucceeded?.Invoke(session);
         }
         finally { IsBusy = false; }
     }

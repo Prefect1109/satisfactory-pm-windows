@@ -53,6 +53,15 @@ public class UserInfo
 
     [JsonPropertyName("until")]
     public string? Until { get; set; }
+
+    [JsonPropertyName("username")]
+    public string? Username { get; set; }
+
+    [JsonPropertyName("storage_used")]
+    public long StorageUsed { get; set; }
+
+    [JsonPropertyName("storage_limit")]
+    public long StorageLimit { get; set; }
 }
 
 public class VersionInfo

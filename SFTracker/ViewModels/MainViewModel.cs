@@ -27,6 +27,9 @@ public class MainViewModel : ViewModelBase
     private bool _isPremium;
     public bool IsPremium { get => _isPremium; set => Set(ref _isPremium, value); }
 
+    private string _username = "";
+    public string Username { get => _username; set => Set(ref _username, value); }
+
     private bool _skipConfirm;
     public bool SkipConfirm
     {
@@ -103,7 +106,10 @@ public class MainViewModel : ViewModelBase
             if (me != null)
             {
                 IsPremium = me.IsPremium;
-                StorageInfo = me.IsPremium && me.Until != null ? $"PRO до {me.Until[..10]}" : "";
+                Username = me.Username ?? "";
+                var usedMb = me.StorageUsed / (1024.0 * 1024.0);
+                var limitMb = me.StorageLimit / (1024.0 * 1024.0);
+                StorageInfo = $"{usedMb:F0} MB / {limitMb:F0} MB";
             }
 
             var worlds = await _api.GetWorldsAsync();

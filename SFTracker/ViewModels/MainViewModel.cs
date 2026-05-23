@@ -192,9 +192,21 @@ public class MainViewModel : ViewModelBase
     {
         var f = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
         if (f == null) { LocalSaveInfo = "Сейвів немає"; return; }
-        var tag = f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase) ? " [auto]" : "";
-        var pt = FormatPlayTime(SaveParser.ReadPlayTimeSec(f.FullName));
-        LocalSaveInfo = $"{f.Name}{tag}\n{f.Length / 1024} KB · {pt}\n{f.LastWriteTime:dd.MM HH:mm}";
+
+        var tag      = f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase) ? " [auto]" : "";
+        var localSec = SaveParser.ReadPlayTimeSec(f.FullName);
+        var pt       = FormatPlayTime(localSec);
+
+        string delta = "";
+        if (CloudMeta?.Exists == true && localSec > 0 && CloudMeta.PlayTimeSec > 0)
+        {
+            var diff = localSec - CloudMeta.PlayTimeSec;
+            delta = diff >= 0
+                ? $"\n(+{FormatPlayTime(diff)} від хмари)"
+                : $"\n(-{FormatPlayTime(-diff)} від хмари)";
+        }
+
+        LocalSaveInfo = $"{f.Name}{tag}\n{f.Length / 1024} KB · {pt}{delta}\n{f.LastWriteTime:dd.MM HH:mm}";
     }
 
     private void UpdateCloudInfo()
@@ -344,6 +356,7 @@ public class MainViewModel : ViewModelBase
     private static string FormatPlayTime(int sec)
     {
         if (sec <= 0) return "—";
+        if (sec < 60) return "< 1хв";
         var h = sec / 3600;
         var m = (sec % 3600) / 60;
         return h > 0 ? $"{h}г {m}хв" : $"{m}хв";

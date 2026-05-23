@@ -8,13 +8,19 @@
     <AssemblyName>SFTracker</AssemblyName>
     <RootNamespace>SFTracker</RootNamespace>
     <ApplicationIcon>..\assets\icon.ico</ApplicationIcon>
-    <Version>1.4.4</Version>
+    <Version>1.4.5</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="..\assets\icon.ico" Link="Assets\icon.ico" />
+  </ItemGroup>
+
+  <!-- UseWindowsForms додає implicit global using System.Windows.Forms; — прибираємо щоб не конфліктувало з WPF типами.
+       У MainWindow.xaml.cs є явний using System.Windows.Forms; де він потрібен. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
   </ItemGroup>
 
 </Project>

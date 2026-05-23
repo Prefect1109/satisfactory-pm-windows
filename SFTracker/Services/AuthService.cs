@@ -66,4 +66,20 @@ public static class AuthService
         Directory.CreateDirectory(Path.GetDirectoryName(SkipConfirmPath)!);
         File.WriteAllText(SkipConfirmPath, skip ? "1" : "0");
     }
+
+    private static readonly string AutoSyncPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SFTracker", "auto_sync.txt");
+
+    public static bool LoadAutoSync()
+    {
+        try { return File.Exists(AutoSyncPath) && File.ReadAllText(AutoSyncPath).Trim() == "1"; }
+        catch { return false; }
+    }
+
+    public static void SaveAutoSync(bool value)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(AutoSyncPath)!);
+        File.WriteAllText(AutoSyncPath, value ? "1" : "0");
+    }
 }

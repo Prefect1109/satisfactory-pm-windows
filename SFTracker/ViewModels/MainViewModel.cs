@@ -12,16 +12,31 @@ public class MainViewModel : ViewModelBase
 {
     private readonly ApiService _api;
 
+    private GameWatcher? _gameWatcher;
+
     public MainViewModel(ApiService api)
     {
         _api = api;
         _skipConfirm = AuthService.LoadSkipConfirm();
+        _autoSync    = AuthService.LoadAutoSync();
         SyncCommand     = new RelayCommand(async _ => await SyncAsync(),     _ => SelectedWorld != null && !IsBusy);
         UploadCommand   = new RelayCommand(async _ => await ConfirmAndUploadAsync(), _ => SelectedWorld != null && !IsBusy);
         DownloadCommand = new RelayCommand(async _ => await ConfirmAndDownloadAsync(), _ => SelectedWorld != null && !IsBusy);
         LogoutCommand   = new RelayCommand(_ => Logout());
         RefreshCommand  = new RelayCommand(async _ => await LoadAsync(), _ => !IsBusy);
         OpenSaveFolderCommand = new RelayCommand(_ => OpenSaveFolder());
+    }
+
+    public void AttachGameWatcher(GameWatcher watcher)
+    {
+        _gameWatcher = watcher;
+        _gameWatcher.GameClosed += OnGameClosed;
+    }
+
+    public void DetachGameWatcher()
+    {
+        if (_gameWatcher != null)
+            _gameWatcher.GameClosed -= OnGameClosed;
     }
 
     private bool _isPremium;
@@ -36,6 +51,15 @@ public class MainViewModel : ViewModelBase
         get => _skipConfirm;
         set { Set(ref _skipConfirm, value); AuthService.SaveSkipConfirm(value); }
     }
+
+    private bool _autoSync;
+    public bool AutoSync
+    {
+        get => _autoSync;
+        set { Set(ref _autoSync, value); AuthService.SaveAutoSync(value); AutoSyncChanged?.Invoke(value); }
+    }
+
+    public event Action<bool>? AutoSyncChanged;
 
     private string _storageInfo = "";
     public string StorageInfo { get => _storageInfo; set => Set(ref _storageInfo, value); }
@@ -300,8 +324,47 @@ public class MainViewModel : ViewModelBase
         finally { IsBusy = false; ProgressVisible = false; }
     }
 
+    private async void OnGameClosed()
+    {
+        if (!AutoSync) return;
+        if (SelectedWorld == null || CloudMeta == null || !CloudMeta.Exists) return;
+
+        // Чекаємо поки гра допише сейв на диск
+        await Task.Delay(3000);
+
+        // Беремо найновіший .sav файл
+        var allSaves = GetAllSaveFiles();
+        var recentSave = allSaves.MaxBy(f => f.LastWriteTime);
+        if (recentSave == null) return;
+
+        // Читаємо session name з хедера і перевіряємо що це наш світ
+        var sessionName = SaveParser.ReadSessionName(recentSave.FullName);
+        if (!string.Equals(sessionName, CloudMeta.SessionName, StringComparison.OrdinalIgnoreCase)) return;
+
+        // Порівнюємо play time — синхронізуємо тільки якщо є щось нове
+        var localPt = SaveParser.ReadPlayTimeSec(recentSave.FullName);
+        if (localPt <= CloudMeta.PlayTimeSec) return;
+
+        // Диспатч на UI thread
+        await Application.Current.Dispatcher.InvokeAsync(async () =>
+        {
+            if (IsBusy) return;
+            IsBusy = true; ProgressVisible = true; Progress = 0;
+            StatusText = "Автосинк: завантаження...";
+            try
+            {
+                var ok = await _api.UploadSaveAsync(SelectedWorld.Id, recentSave.FullName,
+                    new Progress<double>(p => Progress = p * 100));
+                StatusText = ok ? $"Автосинк ✓ ({FormatPlayTime(localPt)})" : "Автосинк: помилка завантаження";
+                if (ok) await LoadWorldMetaAsync();
+            }
+            finally { IsBusy = false; ProgressVisible = false; }
+        });
+    }
+
     private void Logout()
     {
+        DetachGameWatcher();
         AuthService.ClearToken();
         _api.ClearToken();
         LoggedOut?.Invoke();

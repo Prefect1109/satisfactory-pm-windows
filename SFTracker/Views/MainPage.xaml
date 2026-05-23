@@ -127,6 +127,14 @@
                           FontSize="12" Cursor="Hand">
                     Не питати підтвердження
                 </CheckBox>
+
+                <!-- Auto-sync -->
+                <CheckBox Margin="0,6,0,0"
+                          IsChecked="{Binding AutoSync}"
+                          Foreground="{StaticResource TextSecondaryBrush}"
+                          FontSize="12" Cursor="Hand">
+                    Авто-синк при закритті гри (фон)
+                </CheckBox>
             </StackPanel>
         </Border>
 

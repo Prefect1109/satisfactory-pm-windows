@@ -15,19 +15,24 @@ public class MainViewModel : ViewModelBase
     public MainViewModel(ApiService api)
     {
         _api = api;
-        SyncCommand   = new RelayCommand(async _ => await SyncAsync(),     _ => SelectedWorld != null && !IsBusy);
-        UploadCommand = new RelayCommand(async _ => await UploadAsync(),   _ => SelectedWorld != null && !IsBusy);
-        DownloadCommand = new RelayCommand(async _ => await DownloadAsync(), _ => SelectedWorld != null && !IsBusy);
-        LogoutCommand = new RelayCommand(_ => Logout());
-        RefreshCommand = new RelayCommand(async _ => await LoadAsync(), _ => !IsBusy);
+        _skipConfirm = AuthService.LoadSkipConfirm();
+        SyncCommand     = new RelayCommand(async _ => await SyncAsync(),     _ => SelectedWorld != null && !IsBusy);
+        UploadCommand   = new RelayCommand(async _ => await ConfirmAndUploadAsync(), _ => SelectedWorld != null && !IsBusy);
+        DownloadCommand = new RelayCommand(async _ => await ConfirmAndDownloadAsync(), _ => SelectedWorld != null && !IsBusy);
+        LogoutCommand   = new RelayCommand(_ => Logout());
+        RefreshCommand  = new RelayCommand(async _ => await LoadAsync(), _ => !IsBusy);
         OpenSaveFolderCommand = new RelayCommand(_ => OpenSaveFolder());
     }
 
-    private string _username = "";
-    public string Username { get => _username; set => Set(ref _username, value); }
-
     private bool _isPremium;
     public bool IsPremium { get => _isPremium; set => Set(ref _isPremium, value); }
+
+    private bool _skipConfirm;
+    public bool SkipConfirm
+    {
+        get => _skipConfirm;
+        set { Set(ref _skipConfirm, value); AuthService.SaveSkipConfirm(value); }
+    }
 
     private string _storageInfo = "";
     public string StorageInfo { get => _storageInfo; set => Set(ref _storageInfo, value); }
@@ -97,11 +102,8 @@ public class MainViewModel : ViewModelBase
             var me = await _api.GetMeAsync();
             if (me != null)
             {
-                Username = me.Username;
                 IsPremium = me.IsPremium;
-                var usedMb = me.StorageUsed / 1024 / 1024;
-                var limitMb = me.StorageLimit / 1024 / 1024;
-                StorageInfo = $"{usedMb} / {limitMb} MB";
+                StorageInfo = me.IsPremium && me.Until != null ? $"PRO до {me.Until[..10]}" : "";
             }
 
             var worlds = await _api.GetWorldsAsync();
@@ -150,7 +152,7 @@ public class MainViewModel : ViewModelBase
         SyncDirection = cmp > 0 ? "↑ Sync" : cmp < 0 ? "↓ Sync" : "✓ Sync";
     }
 
-    // Smart sync по play time — найбільше награного часу перемагає
+    // Smart sync по play time
     private async Task SyncAsync()
     {
         var local = FindBestLocalSave(SelectedWorld?.Name);
@@ -158,18 +160,66 @@ public class MainViewModel : ViewModelBase
         if (local == null && (CloudMeta == null || !CloudMeta.Exists))
         { StatusText = "Немає сейвів ні локально, ні в хмарі"; return; }
 
-        if (local == null) { await DownloadAsync(); return; }
-        if (CloudMeta == null || !CloudMeta.Exists) { await UploadAsync(); return; }
+        if (local == null) { await ConfirmAndDownloadAsync(); return; }
+        if (CloudMeta == null || !CloudMeta.Exists) { await ConfirmAndUploadAsync(); return; }
 
         var (cmp, reason) = ComparePlayTime(local, CloudMeta);
-        StatusText = reason;
 
-        if (cmp > 0)
-            await UploadAsync();
-        else if (cmp < 0)
-            await DownloadAsync();
+        if (cmp == 0) { StatusText = "Вже синхронізовано ✓"; return; }
+
+        bool isUpload = cmp > 0;
+        if (!Confirm(isUpload, local, reason)) return;
+
+        if (isUpload) await UploadAsync();
+        else await DownloadAsync();
+    }
+
+    private async Task ConfirmAndUploadAsync()
+    {
+        var local = FindBestLocalSave(SelectedWorld?.Name);
+        if (local == null) { StatusText = "Локальний сейв не знайдено"; return; }
+        var (_, reason) = CloudMeta?.Exists == true
+            ? ComparePlayTime(local, CloudMeta!)
+            : (1, "Хмара порожня");
+        if (!Confirm(true, local, reason)) return;
+        await UploadAsync();
+    }
+
+    private async Task ConfirmAndDownloadAsync()
+    {
+        var local = FindBestLocalSave(SelectedWorld?.Name);
+        var (_, reason) = (local != null && CloudMeta?.Exists == true)
+            ? ComparePlayTime(local, CloudMeta!)
+            : (-1, "Локального сейву немає");
+        if (!Confirm(false, local, reason)) return;
+        await DownloadAsync();
+    }
+
+    private bool Confirm(bool isUpload, FileInfo? local, string reason)
+    {
+        if (SkipConfirm) return true;
+
+        var localPt  = local != null ? FormatPlayTime(SaveParser.ReadPlayTimeSec(local.FullName)) : "—";
+        var cloudPt  = CloudMeta?.Exists == true ? FormatPlayTime(CloudMeta.PlayTimeSec) : "—";
+        var worldName = SelectedWorld?.Name ?? "";
+
+        string action, what, overwriting;
+        if (isUpload)
+        {
+            action     = "⬆ UPLOAD";
+            what       = $"Локальний сейв ({localPt} награно)\n→ перезапише хмарний ({cloudPt})";
+            overwriting = "Хмарний сейв буде перезаписано.";
+        }
         else
-            StatusText = "Вже синхронізовано ✓";
+        {
+            action     = "⬇ DOWNLOAD";
+            what       = $"Хмарний сейв ({cloudPt} награно)\n→ збережеться поруч з локальним";
+            overwriting = "Локальний файл НЕ видаляється — новий ляже поруч.";
+        }
+
+        var msg = $"[{worldName}] {action}\n\n{what}\n\n{reason}\n\n{overwriting}";
+        var result = MessageBox.Show(msg, "Підтвердження", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+        return result == MessageBoxResult.OK;
     }
 
     // Повертає (1 = local новіший, -1 = cloud новіший, 0 = однаково) + опис причини
@@ -233,9 +283,11 @@ public class MainViewModel : ViewModelBase
         StatusText = "Download з сервера...";
         try
         {
+            // Ніколи не перезаписуємо — унікальне ім'я з timestamp
             var path = await _api.DownloadSaveAsync(SelectedWorld!.Id, dir,
-                new Progress<double>(p => Progress = p * 100));
-            StatusText = path != null ? "Скачано ✓" : "Помилка download";
+                new Progress<double>(p => Progress = p * 100),
+                uniqueName: true);
+            StatusText = path != null ? $"Скачано ✓ → {System.IO.Path.GetFileName(path)}" : "Помилка download";
             RefreshLocalInfo();
             UpdateSyncDirection();
         }

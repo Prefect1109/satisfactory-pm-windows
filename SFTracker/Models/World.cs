@@ -18,6 +18,8 @@ public class World
 
     [JsonPropertyName("member_count")]
     public int MemberCount { get; set; }
+
+    public override string ToString() => Name;
 }
 
 public class SaveMetadata
@@ -46,20 +48,11 @@ public class SaveMetadata
 
 public class UserInfo
 {
-    [JsonPropertyName("id")]
-    public int Id { get; set; }
-
-    [JsonPropertyName("username")]
-    public string Username { get; set; } = "";
-
-    [JsonPropertyName("is_premium")]
+    [JsonPropertyName("active")]
     public bool IsPremium { get; set; }
 
-    [JsonPropertyName("storage_used")]
-    public long StorageUsed { get; set; }
-
-    [JsonPropertyName("storage_limit")]
-    public long StorageLimit { get; set; }
+    [JsonPropertyName("until")]
+    public string? Until { get; set; }
 }
 
 public class VersionInfo

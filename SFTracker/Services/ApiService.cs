@@ -63,7 +63,7 @@ public class ApiService
         catch { return null; }
     }
 
-    public async Task<string?> DownloadSaveAsync(int worldId, string targetDir, IProgress<double>? progress = null)
+    public async Task<string?> DownloadSaveAsync(int worldId, string targetDir, IProgress<double>? progress = null, bool uniqueName = false)
     {
         try
         {
@@ -72,8 +72,20 @@ public class ApiService
             if (!resp.IsSuccessStatusCode) return null;
 
             var cd = resp.Content.Headers.ContentDisposition?.FileName?.Trim('"');
-            var filename = string.IsNullOrEmpty(cd) ? $"world_{worldId}_latest.sav" : cd;
-            var fullPath = Path.Combine(targetDir, filename);
+            var baseName = string.IsNullOrEmpty(cd) ? $"world_{worldId}.sav" : cd;
+
+            // Ніколи не перезаписуємо — додаємо timestamp якщо файл вже є
+            string fullPath;
+            if (uniqueName || File.Exists(Path.Combine(targetDir, baseName)))
+            {
+                var ts = DateTime.Now.ToString("yyyyMMdd-HHmm");
+                var nameNoExt = Path.GetFileNameWithoutExtension(baseName);
+                fullPath = Path.Combine(targetDir, $"{nameNoExt}_{ts}.sav");
+            }
+            else
+            {
+                fullPath = Path.Combine(targetDir, baseName);
+            }
 
             var total = resp.Content.Headers.ContentLength ?? -1;
             long downloaded = 0;

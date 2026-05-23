@@ -50,4 +50,20 @@ public static class AuthService
         Directory.CreateDirectory(Path.GetDirectoryName(LastWorldPath)!);
         File.WriteAllText(LastWorldPath, worldId.ToString());
     }
+
+    private static readonly string SkipConfirmPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SFTracker", "skip_confirm.txt");
+
+    public static bool LoadSkipConfirm()
+    {
+        try { return File.Exists(SkipConfirmPath) && File.ReadAllText(SkipConfirmPath).Trim() == "1"; }
+        catch { return false; }
+    }
+
+    public static void SaveSkipConfirm(bool skip)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SkipConfirmPath)!);
+        File.WriteAllText(SkipConfirmPath, skip ? "1" : "0");
+    }
 }

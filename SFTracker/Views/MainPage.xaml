@@ -16,18 +16,18 @@
         <!-- Header -->
         <Border Grid.Row="0" Style="{StaticResource GlassCard}" Margin="0,0,0,8">
             <Grid>
-                <StackPanel VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Username}" FontSize="15" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextPrimaryBrush}"/>
-                        <Border Background="{StaticResource AccentBrush}" CornerRadius="4"
-                                Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center"
-                                Visibility="{Binding IsPremium, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="PRO" FontSize="9" FontWeight="Bold" Foreground="White"/>
-                        </Border>
-                    </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="SF Tracker" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <Border Background="{StaticResource AccentBrush}" CornerRadius="4"
+                            Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center"
+                            Visibility="{Binding IsPremium, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="PRO" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                    </Border>
                     <TextBlock Text="{Binding StorageInfo}" FontSize="11"
-                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding StorageInfo, Converter={StaticResource NotEmptyToVisibility}}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button Style="{StaticResource IconButton}" Command="{Binding OpenSaveFolderCommand}"
@@ -110,6 +110,14 @@
                     <Button Grid.Column="1" Content="↓ Download" Style="{StaticResource SecondaryButton}"
                             Command="{Binding DownloadCommand}" Margin="4,0,0,0" FontSize="12"/>
                 </Grid>
+
+                <!-- Skip confirmation -->
+                <CheckBox Margin="0,12,0,0"
+                          IsChecked="{Binding SkipConfirm}"
+                          Foreground="{StaticResource TextSecondaryBrush}"
+                          FontSize="12" Cursor="Hand">
+                    Не питати підтвердження
+                </CheckBox>
             </StackPanel>
         </Border>
 

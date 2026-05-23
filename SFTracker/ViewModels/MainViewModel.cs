@@ -19,6 +19,7 @@ public class MainViewModel : ViewModelBase
         _api = api;
         _skipConfirm = AuthService.LoadSkipConfirm();
         _autoSync    = AuthService.LoadAutoSync();
+        _autoStart   = StartupService.IsEnabled();
         SyncCommand     = new RelayCommand(async _ => await SyncAsync(),     _ => SelectedWorld != null && !IsBusy);
         UploadCommand   = new RelayCommand(async _ => await ConfirmAndUploadAsync(), _ => SelectedWorld != null && !IsBusy);
         DownloadCommand = new RelayCommand(async _ => await ConfirmAndDownloadAsync(), _ => SelectedWorld != null && !IsBusy);
@@ -56,10 +57,42 @@ public class MainViewModel : ViewModelBase
     public bool AutoSync
     {
         get => _autoSync;
-        set { Set(ref _autoSync, value); AuthService.SaveAutoSync(value); AutoSyncChanged?.Invoke(value); }
+        set
+        {
+            Set(ref _autoSync, value);
+            AuthService.SaveAutoSync(value);
+            AutoSyncChanged?.Invoke(value);
+            if (value) MaybeAskAutoStart();
+        }
     }
 
     public event Action<bool>? AutoSyncChanged;
+
+    private bool _autoStart;
+    public bool AutoStart
+    {
+        get => _autoStart;
+        set
+        {
+            Set(ref _autoStart, value);
+            if (value) StartupService.Enable();
+            else StartupService.Disable();
+        }
+    }
+
+    private void MaybeAskAutoStart()
+    {
+        if (AuthService.WasAutoStartAsked()) return;
+        AuthService.MarkAutoStartAsked();
+
+        var result = MessageBox.Show(
+            "Додати SFTracker до автозапуску Windows?\n\nЦе дозволить авто-синку працювати без ручного запуску програми.",
+            "Автозапуск",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        AutoStart = result == MessageBoxResult.Yes;
+    }
 
     private string _storageInfo = "";
     public string StorageInfo { get => _storageInfo; set => Set(ref _storageInfo, value); }

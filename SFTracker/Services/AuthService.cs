@@ -82,4 +82,20 @@ public static class AuthService
         Directory.CreateDirectory(Path.GetDirectoryName(AutoSyncPath)!);
         File.WriteAllText(AutoSyncPath, value ? "1" : "0");
     }
+
+    private static readonly string AutoStartAskedPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SFTracker", "autostart_asked.txt");
+
+    public static bool WasAutoStartAsked()
+    {
+        try { return File.Exists(AutoStartAskedPath); }
+        catch { return false; }
+    }
+
+    public static void MarkAutoStartAsked()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(AutoStartAskedPath)!);
+        File.WriteAllText(AutoStartAskedPath, "1");
+    }
 }

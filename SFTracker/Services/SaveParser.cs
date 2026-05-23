@@ -15,36 +15,50 @@ public static class SaveParser
         {
             using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using var br = new BinaryReader(fs);
-
-            // Header layout:
-            // int32 saveHeaderVersion
-            // int32 saveVersion
-            // int32 buildVersion
-            // FString mapName
-            // FString mapOptions
-            // FString sessionName
-            // int32 playDurationSeconds  ← this
-            br.ReadInt32(); // saveHeaderVersion
-            br.ReadInt32(); // saveVersion
-            br.ReadInt32(); // buildVersion
-
+            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); // saveHeaderVersion, saveVersion, buildVersion
             SkipFString(br); // mapName
             SkipFString(br); // mapOptions
             SkipFString(br); // sessionName
-
             return br.ReadInt32();
         }
         catch { return 0; }
     }
 
+    public static string? ReadSessionName(string filePath)
+    {
+        try
+        {
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var br = new BinaryReader(fs);
+            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); // saveHeaderVersion, saveVersion, buildVersion
+            SkipFString(br); // mapName
+            SkipFString(br); // mapOptions
+            return ReadFString(br); // sessionName
+        }
+        catch { return null; }
+    }
+
     // FString: positive length = UTF-8 (includes null), negative = UTF-16LE (abs chars, includes null)
+    private static string? ReadFString(BinaryReader br)
+    {
+        var len = br.ReadInt32();
+        if (len == 0) return null;
+        if (len > 0)
+        {
+            var bytes = br.ReadBytes(len);
+            return Encoding.UTF8.GetString(bytes).TrimEnd('\0');
+        }
+        else
+        {
+            var bytes = br.ReadBytes(-len * 2);
+            return Encoding.Unicode.GetString(bytes).TrimEnd('\0');
+        }
+    }
+
     private static void SkipFString(BinaryReader br)
     {
         var len = br.ReadInt32();
         if (len == 0) return;
-        if (len > 0)
-            br.BaseStream.Seek(len, SeekOrigin.Current);
-        else
-            br.BaseStream.Seek(-len * 2, SeekOrigin.Current); // UTF-16LE chars
+        br.BaseStream.Seek(len > 0 ? len : -len * 2, SeekOrigin.Current);
     }
 }

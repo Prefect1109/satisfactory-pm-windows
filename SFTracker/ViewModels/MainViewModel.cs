@@ -133,7 +133,7 @@ public class MainViewModel : ViewModelBase
 
     private void RefreshLocalInfo()
     {
-        var f = FindBestLocalSave(SelectedWorld?.Name);
+        var f = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
         if (f == null) { LocalSaveInfo = "Сейвів немає"; return; }
         var tag = f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase) ? " [auto]" : "";
         var pt = FormatPlayTime(SaveParser.ReadPlayTimeSec(f.FullName));
@@ -150,7 +150,7 @@ public class MainViewModel : ViewModelBase
 
     private void UpdateSyncDirection()
     {
-        var local = FindBestLocalSave(SelectedWorld?.Name);
+        var local = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
         if (local == null) { SyncDirection = "↓ Sync"; return; }
         if (CloudMeta == null || !CloudMeta.Exists) { SyncDirection = "↑ Sync"; return; }
 
@@ -161,7 +161,7 @@ public class MainViewModel : ViewModelBase
     // Smart sync по play time
     private async Task SyncAsync()
     {
-        var local = FindBestLocalSave(SelectedWorld?.Name);
+        var local = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
 
         if (local == null && (CloudMeta == null || !CloudMeta.Exists))
         { StatusText = "Немає сейвів ні локально, ні в хмарі"; return; }
@@ -182,7 +182,7 @@ public class MainViewModel : ViewModelBase
 
     private async Task ConfirmAndUploadAsync()
     {
-        var local = FindBestLocalSave(SelectedWorld?.Name);
+        var local = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
         if (local == null) { StatusText = "Локальний сейв не знайдено"; return; }
         var (_, reason) = CloudMeta?.Exists == true
             ? ComparePlayTime(local, CloudMeta!)
@@ -193,7 +193,7 @@ public class MainViewModel : ViewModelBase
 
     private async Task ConfirmAndDownloadAsync()
     {
-        var local = FindBestLocalSave(SelectedWorld?.Name);
+        var local = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
         var (_, reason) = (local != null && CloudMeta?.Exists == true)
             ? ComparePlayTime(local, CloudMeta!)
             : (-1, "Локального сейву немає");
@@ -265,7 +265,7 @@ public class MainViewModel : ViewModelBase
 
     private async Task UploadAsync()
     {
-        var f = FindBestLocalSave(SelectedWorld?.Name);
+        var f = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
         if (f == null) { StatusText = "Локальний сейв не знайдено"; return; }
 
         IsBusy = true; ProgressVisible = true; Progress = 0;
@@ -315,20 +315,26 @@ public class MainViewModel : ViewModelBase
     }
 
     // Шукає найкращий сейв для цього світу:
-    // 1. Звичайний .sav з назвою світу
-    // 2. Autosave з назвою світу
-    // 3. Будь-який звичайний .sav
-    // 4. Будь-який autosave
-    private static FileInfo? FindBestLocalSave(string? worldName)
+    // 1. Звичайний .sav з sessionName в хедері (точне співпадіння)
+    // 2. Autosave з sessionName в хедері
+    // 3. Fallback: звичайний .sav з назвою світу в імені файлу
+    // 4. Fallback: autosave з назвою світу в імені файлу
+    // 5. Будь-який звичайний .sav
+    // 6. Будь-який autosave
+    private static FileInfo? FindBestLocalSave(string? sessionName, string? worldName = null)
     {
         var all = GetAllSaveFiles();
         if (all.Count == 0) return null;
 
         bool IsAuto(FileInfo f) => f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase);
+        bool MatchesSession(FileInfo f) => !string.IsNullOrEmpty(sessionName) &&
+            string.Equals(SaveParser.ReadSessionName(f.FullName), sessionName, StringComparison.OrdinalIgnoreCase);
         bool MatchesWorld(FileInfo f) => !string.IsNullOrEmpty(worldName) &&
             f.Name.Contains(worldName, StringComparison.OrdinalIgnoreCase);
 
-        return all.Where(f => !IsAuto(f) && MatchesWorld(f)).MaxBy(f => f.LastWriteTime)
+        return all.Where(f => !IsAuto(f) && MatchesSession(f)).MaxBy(f => f.LastWriteTime)
+            ?? all.Where(f =>  IsAuto(f) && MatchesSession(f)).MaxBy(f => f.LastWriteTime)
+            ?? all.Where(f => !IsAuto(f) && MatchesWorld(f)).MaxBy(f => f.LastWriteTime)
             ?? all.Where(f =>  IsAuto(f) && MatchesWorld(f)).MaxBy(f => f.LastWriteTime)
             ?? all.Where(f => !IsAuto(f)).MaxBy(f => f.LastWriteTime)
             ?? all.MaxBy(f => f.LastWriteTime);

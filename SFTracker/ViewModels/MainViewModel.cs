@@ -167,7 +167,10 @@ public class MainViewModel : ViewModelBase
     private void UpdateCloudInfo()
     {
         if (CloudMeta == null || !CloudMeta.Exists) { CloudSaveInfo = "Порожньо"; return; }
-        var date = CloudMeta.UpdatedAt?.Replace("T", " ") ?? "";
+        var date = CloudMeta.UpdatedAt != null && DateTime.TryParse(CloudMeta.UpdatedAt,
+            null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt)
+            ? TimeZoneInfo.ConvertTimeBySystemTimeZoneId(dt, "FLE Standard Time").ToString("dd.MM HH:mm")
+            : "";
         var pt = FormatPlayTime(CloudMeta.PlayTimeSec);
         CloudSaveInfo = $"{CloudMeta.SessionName ?? CloudMeta.Filename}\n{CloudMeta.Size / 1024} KB · {pt}\n{date}";
     }

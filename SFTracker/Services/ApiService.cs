@@ -63,7 +63,8 @@ public class ApiService
         catch { return null; }
     }
 
-    public async Task<string?> DownloadSaveAsync(int worldId, string targetDir, IProgress<double>? progress = null, bool uniqueName = false)
+    // targetFilePath — повний шлях куди зберегти (включно з ім'ям файлу), завжди перезаписує
+    public async Task<string?> DownloadSaveAsync(int worldId, string targetFilePath, IProgress<double>? progress = null)
     {
         try
         {
@@ -71,27 +72,12 @@ public class ApiService
                 HttpCompletionOption.ResponseHeadersRead);
             if (!resp.IsSuccessStatusCode) return null;
 
-            var cd = resp.Content.Headers.ContentDisposition?.FileName?.Trim('"');
-            var baseName = string.IsNullOrEmpty(cd) ? $"world_{worldId}.sav" : cd;
-
-            // Ніколи не перезаписуємо — додаємо timestamp якщо файл вже є
-            string fullPath;
-            if (uniqueName || File.Exists(Path.Combine(targetDir, baseName)))
-            {
-                var ts = DateTime.Now.ToString("yyyyMMdd-HHmm");
-                var nameNoExt = Path.GetFileNameWithoutExtension(baseName);
-                fullPath = Path.Combine(targetDir, $"{nameNoExt}_{ts}.sav");
-            }
-            else
-            {
-                fullPath = Path.Combine(targetDir, baseName);
-            }
-
+            Directory.CreateDirectory(Path.GetDirectoryName(targetFilePath)!);
             var total = resp.Content.Headers.ContentLength ?? -1;
             long downloaded = 0;
 
             await using var stream = await resp.Content.ReadAsStreamAsync();
-            await using var file = File.Create(fullPath);
+            await using var file = File.Create(targetFilePath); // перезаписує якщо є
             var buf = new byte[8192];
             int read;
             while ((read = await stream.ReadAsync(buf)) > 0)
@@ -100,19 +86,20 @@ public class ApiService
                 downloaded += read;
                 if (total > 0) progress?.Report((double)downloaded / total);
             }
-            return fullPath;
+            return targetFilePath;
         }
         catch { return null; }
     }
 
-    public async Task<bool> UploadSaveAsync(int worldId, string filePath, IProgress<double>? progress = null)
+    // uploadAsName — ім'я файлу яке побачить сервер (стандартизоване: WorldName.sav)
+    public async Task<bool> UploadSaveAsync(int worldId, string filePath, string uploadAsName, IProgress<double>? progress = null)
     {
         try
         {
             await using var fileStream = File.OpenRead(filePath);
             using var content = new MultipartFormDataContent();
             using var streamContent = new StreamContent(fileStream);
-            content.Add(streamContent, "file", Path.GetFileName(filePath));
+            content.Add(streamContent, "file", uploadAsName);
 
             var resp = await _http.PostAsync($"{BaseUrl}/worlds/{worldId}/save", content);
             return resp.IsSuccessStatusCode;

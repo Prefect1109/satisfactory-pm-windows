@@ -279,8 +279,8 @@ public class MainViewModel : ViewModelBase
         else
         {
             action     = "⬇ DOWNLOAD";
-            what       = $"Хмарний сейв ({cloudPt} награно)\n→ збережеться поруч з локальним";
-            overwriting = "Локальний файл НЕ видаляється — новий ляже поруч.";
+            what       = $"Хмарний сейв ({cloudPt} награно)\n→ перезапише локальний ({localPt})";
+            overwriting = $"Буде записано як {SelectedWorld?.Name}.sav";
         }
 
         var msg = $"[{worldName}] {action}\n\n{what}\n\n{reason}\n\n{overwriting}";
@@ -328,11 +328,12 @@ public class MainViewModel : ViewModelBase
         var f = FindBestLocalSave(CloudMeta?.SessionName, SelectedWorld?.Name);
         if (f == null) { StatusText = "Локальний сейв не знайдено"; return; }
 
+        var standardName = $"{SelectedWorld!.Name}.sav";
         IsBusy = true; ProgressVisible = true; Progress = 0;
-        StatusText = $"Upload: {f.Name}...";
+        StatusText = $"Upload: {standardName}...";
         try
         {
-            var ok = await _api.UploadSaveAsync(SelectedWorld!.Id, f.FullName,
+            var ok = await _api.UploadSaveAsync(SelectedWorld.Id, f.FullName, standardName,
                 new Progress<double>(p => Progress = p * 100));
             StatusText = ok ? "Завантажено на сервер ✓" : "Помилка upload";
             if (ok) await LoadWorldMetaAsync();
@@ -345,15 +346,15 @@ public class MainViewModel : ViewModelBase
         var dir = FindSavesDirectory();
         if (dir == null) { StatusText = "Папку сейвів не знайдено"; return; }
 
+        // Завжди кладемо як WorldName.sav — перезаписуємо (качаємо тільки коли хмара новіша)
+        var targetPath = Path.Combine(dir, $"{SelectedWorld!.Name}.sav");
         IsBusy = true; ProgressVisible = true; Progress = 0;
         StatusText = "Download з сервера...";
         try
         {
-            // Ніколи не перезаписуємо — унікальне ім'я з timestamp
-            var path = await _api.DownloadSaveAsync(SelectedWorld!.Id, dir,
-                new Progress<double>(p => Progress = p * 100),
-                uniqueName: true);
-            StatusText = path != null ? $"Скачано ✓ → {System.IO.Path.GetFileName(path)}" : "Помилка download";
+            var path = await _api.DownloadSaveAsync(SelectedWorld.Id, targetPath,
+                new Progress<double>(p => Progress = p * 100));
+            StatusText = path != null ? $"Скачано ✓ → {Path.GetFileName(path)}" : "Помилка download";
             RefreshLocalInfo();
             UpdateSyncDirection();
         }
@@ -390,6 +391,7 @@ public class MainViewModel : ViewModelBase
             try
             {
                 var ok = await _api.UploadSaveAsync(SelectedWorld.Id, recentSave.FullName,
+                    $"{SelectedWorld.Name}.sav",
                     new Progress<double>(p => Progress = p * 100));
                 StatusText = ok ? $"Автосинк ✓ ({FormatPlayTime(localPt)})" : "Автосинк: помилка завантаження";
                 if (ok) await LoadWorldMetaAsync();

@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text;
 using SFTracker.Models;
 using SFTracker.ViewModels;
 using Xunit;

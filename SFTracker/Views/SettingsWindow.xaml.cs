@@ -79,6 +79,15 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void Support_Click(object sender, RoutedEventArgs e)
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "mailto:prefect.t@icloud.com?subject=SF%20Tracker%20Support",
+            UseShellExecute = true,
+        });
+    }
+
     private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton == MouseButton.Left) DragMove();

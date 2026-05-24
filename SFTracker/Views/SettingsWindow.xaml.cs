@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Input;
 using SFTracker.Services;
-using MessageBox = System.Windows.MessageBox;
 
 namespace SFTracker.Views;
 

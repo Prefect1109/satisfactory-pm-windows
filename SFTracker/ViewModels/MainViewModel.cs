@@ -27,6 +27,9 @@ public class MainViewModel : ViewModelBase
     private bool _isPremium;
     public bool IsPremium { get => _isPremium; set => Set(ref _isPremium, value); }
 
+    private string _username = "";
+    public string Username { get => _username; set => Set(ref _username, value); }
+
     private bool _skipConfirm;
     public bool SkipConfirm
     {
@@ -72,11 +75,29 @@ public class MainViewModel : ViewModelBase
     private SaveMetadata? _cloudMeta;
     public SaveMetadata? CloudMeta { get => _cloudMeta; set { Set(ref _cloudMeta, value); UpdateSyncDirection(); } }
 
-    private string _localSaveInfo = "Не знайдено";
-    public string LocalSaveInfo { get => _localSaveInfo; set => Set(ref _localSaveInfo, value); }
+    // Local save fields
+    private string _localPlayTime = "—";
+    public string LocalPlayTime { get => _localPlayTime; set => Set(ref _localPlayTime, value); }
+    private string _localSaveDate = "";
+    public string LocalSaveDate { get => _localSaveDate; set => Set(ref _localSaveDate, value); }
+    private string _localFileName = "";
+    public string LocalFileName { get => _localFileName; set => Set(ref _localFileName, value); }
+    private bool _localExists;
+    public bool LocalExists { get => _localExists; set => Set(ref _localExists, value); }
 
-    private string _cloudSaveInfo = "Порожньо";
-    public string CloudSaveInfo { get => _cloudSaveInfo; set => Set(ref _cloudSaveInfo, value); }
+    // Cloud save fields
+    private string _cloudPlayTime = "—";
+    public string CloudPlayTime { get => _cloudPlayTime; set => Set(ref _cloudPlayTime, value); }
+    private string _cloudSaveDate = "";
+    public string CloudSaveDate { get => _cloudSaveDate; set => Set(ref _cloudSaveDate, value); }
+    private string _cloudFileName = "";
+    public string CloudFileName { get => _cloudFileName; set => Set(ref _cloudFileName, value); }
+    private bool _cloudExists;
+    public bool CloudExists { get => _cloudExists; set => Set(ref _cloudExists, value); }
+
+    // Sync reason hint (shown between sync button and manual buttons)
+    private string _syncReason = "";
+    public string SyncReason { get => _syncReason; set => Set(ref _syncReason, value); }
 
     // "↑ Upload", "↓ Download", "✓ Sync"
     private string _syncDirection = "⇅ Sync";
@@ -103,7 +124,10 @@ public class MainViewModel : ViewModelBase
             if (me != null)
             {
                 IsPremium = me.IsPremium;
-                StorageInfo = me.IsPremium && me.Until != null ? $"PRO до {me.Until[..10]}" : "";
+                Username = me.Username ?? "";
+                var usedMb = me.StorageUsed / (1024.0 * 1024.0);
+                var limitMb = me.StorageLimit / (1024.0 * 1024.0);
+                StorageInfo = $"{usedMb:F0} MB / {limitMb:F0} MB";
             }
 
             var worlds = await _api.GetWorldsAsync();
@@ -113,6 +137,9 @@ public class MainViewModel : ViewModelBase
             var lastId = AuthService.LoadLastWorld();
             SelectedWorld = Worlds.FirstOrDefault(w => w.Id == lastId) ?? Worlds.FirstOrDefault();
             StatusText = "";
+
+            if (AuthService.LoadAutoSync() && SelectedWorld != null)
+                await SyncAsync();
         }
         finally { IsBusy = false; }
     }
@@ -127,35 +154,46 @@ public class MainViewModel : ViewModelBase
 
     private void RefreshLocalInfo()
     {
-        var f = FindBestLocalSave(SelectedWorld?.Name);
-        if (f == null) { LocalSaveInfo = "Сейвів немає"; return; }
-        var tag = f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase) ? " [auto]" : "";
-        var pt = FormatPlayTime(SaveParser.ReadPlayTimeSec(f.FullName));
-        LocalSaveInfo = $"{f.Name}{tag}\n{f.Length / 1024} KB · {pt}\n{f.LastWriteTime:dd.MM HH:mm}";
+        var f = FindBestLocalSave(SelectedWorld?.Name, CloudMeta?.SessionName);
+        if (f == null)
+        {
+            LocalExists = false; LocalPlayTime = "—"; LocalSaveDate = ""; LocalFileName = "";
+            return;
+        }
+        var isAuto = f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase);
+        LocalExists   = true;
+        LocalPlayTime = SaveParser.FormatPlayTime(SaveParser.ReadPlayTimeSec(f.FullName));
+        LocalSaveDate = f.LastWriteTime.ToString("dd.MM HH:mm");
+        LocalFileName = Path.GetFileNameWithoutExtension(f.Name) + (isAuto ? " [auto]" : "");
     }
 
     private void UpdateCloudInfo()
     {
-        if (CloudMeta == null || !CloudMeta.Exists) { CloudSaveInfo = "Порожньо"; return; }
-        var date = CloudMeta.UpdatedAt?.Replace("T", " ") ?? "";
-        var pt = FormatPlayTime(CloudMeta.PlayTimeSec);
-        CloudSaveInfo = $"{CloudMeta.SessionName ?? CloudMeta.Filename}\n{CloudMeta.Size / 1024} KB · {pt}\n{date}";
+        if (CloudMeta == null || !CloudMeta.Exists)
+        {
+            CloudExists = false; CloudPlayTime = "—"; CloudSaveDate = ""; CloudFileName = "";
+            return;
+        }
+        CloudExists   = true;
+        CloudPlayTime = SaveParser.FormatPlayTime(CloudMeta.PlayTimeSec);
+        CloudSaveDate = CloudMeta.UpdatedAt?.Replace("T", " ") ?? "";
+        CloudFileName = CloudMeta.SessionName ?? CloudMeta.Filename ?? "";
     }
 
     private void UpdateSyncDirection()
     {
-        var local = FindBestLocalSave(SelectedWorld?.Name);
-        if (local == null) { SyncDirection = "↓ Sync"; return; }
-        if (CloudMeta == null || !CloudMeta.Exists) { SyncDirection = "↑ Sync"; return; }
+        var local = FindBestLocalSave(SelectedWorld?.Name, CloudMeta?.SessionName);
+        if (local == null) { SyncDirection = "↓ Sync"; SyncReason = "Локального сейву немає"; return; }
+        if (CloudMeta == null || !CloudMeta.Exists) { SyncDirection = "↑ Sync"; SyncReason = "Хмара порожня"; return; }
 
-        var (cmp, _) = ComparePlayTime(local, CloudMeta);
+        var (cmp, reason) = ComparePlayTime(local, CloudMeta);
         SyncDirection = cmp > 0 ? "↑ Sync" : cmp < 0 ? "↓ Sync" : "✓ Sync";
+        SyncReason = reason;
     }
 
-    // Smart sync по play time
     private async Task SyncAsync()
     {
-        var local = FindBestLocalSave(SelectedWorld?.Name);
+        var local = FindBestLocalSave(SelectedWorld?.Name, CloudMeta?.SessionName);
 
         if (local == null && (CloudMeta == null || !CloudMeta.Exists))
         { StatusText = "Немає сейвів ні локально, ні в хмарі"; return; }
@@ -176,7 +214,7 @@ public class MainViewModel : ViewModelBase
 
     private async Task ConfirmAndUploadAsync()
     {
-        var local = FindBestLocalSave(SelectedWorld?.Name);
+        var local = FindBestLocalSave(SelectedWorld?.Name, CloudMeta?.SessionName);
         if (local == null) { StatusText = "Локальний сейв не знайдено"; return; }
         var (_, reason) = CloudMeta?.Exists == true
             ? ComparePlayTime(local, CloudMeta!)
@@ -187,7 +225,7 @@ public class MainViewModel : ViewModelBase
 
     private async Task ConfirmAndDownloadAsync()
     {
-        var local = FindBestLocalSave(SelectedWorld?.Name);
+        var local = FindBestLocalSave(SelectedWorld?.Name, CloudMeta?.SessionName);
         var (_, reason) = (local != null && CloudMeta?.Exists == true)
             ? ComparePlayTime(local, CloudMeta!)
             : (-1, "Локального сейву немає");
@@ -199,8 +237,8 @@ public class MainViewModel : ViewModelBase
     {
         if (SkipConfirm) return true;
 
-        var localPt  = local != null ? FormatPlayTime(SaveParser.ReadPlayTimeSec(local.FullName)) : "—";
-        var cloudPt  = CloudMeta?.Exists == true ? FormatPlayTime(CloudMeta.PlayTimeSec) : "—";
+        var localPt  = local != null ? SaveParser.FormatPlayTime(SaveParser.ReadPlayTimeSec(local.FullName)) : "—";
+        var cloudPt  = CloudMeta?.Exists == true ? SaveParser.FormatPlayTime(CloudMeta.PlayTimeSec) : "—";
         var worldName = SelectedWorld?.Name ?? "";
 
         string action, what, overwriting;
@@ -223,7 +261,7 @@ public class MainViewModel : ViewModelBase
     }
 
     // Повертає (1 = local новіший, -1 = cloud новіший, 0 = однаково) + опис причини
-    private static (int, string) ComparePlayTime(FileInfo local, SaveMetadata cloud)
+    internal static (int, string) ComparePlayTime(FileInfo local, SaveMetadata cloud)
     {
         var localPt = SaveParser.ReadPlayTimeSec(local.FullName);
         var cloudPt = cloud.PlayTimeSec;
@@ -232,10 +270,10 @@ public class MainViewModel : ViewModelBase
         if (localPt > 0 && cloudPt > 0)
         {
             if (localPt > cloudPt)
-                return (1, $"Локальний +{FormatPlayTime(localPt - cloudPt)} більше награного часу");
+                return (1, $"Локальний +{SaveParser.FormatPlayTime(localPt - cloudPt)} більше награного часу");
             if (cloudPt > localPt)
-                return (-1, $"Хмарний +{FormatPlayTime(cloudPt - localPt)} більше награного часу");
-            return (0, $"Однаковий play time: {FormatPlayTime(localPt)}");
+                return (-1, $"Хмарний +{SaveParser.FormatPlayTime(cloudPt - localPt)} більше награного часу");
+            return (0, $"Однаковий play time: {SaveParser.FormatPlayTime(localPt)}");
         }
 
         // Fallback на дату якщо play time недоступний (dedicated server header = 0)
@@ -249,17 +287,9 @@ public class MainViewModel : ViewModelBase
         return (0, "Однаково");
     }
 
-    private static string FormatPlayTime(int sec)
-    {
-        if (sec <= 0) return "—";
-        var h = sec / 3600;
-        var m = (sec % 3600) / 60;
-        return h > 0 ? $"{h}г {m}хв" : $"{m}хв";
-    }
-
     private async Task UploadAsync()
     {
-        var f = FindBestLocalSave(SelectedWorld?.Name);
+        var f = FindBestLocalSave(SelectedWorld?.Name, CloudMeta?.SessionName);
         if (f == null) { StatusText = "Локальний сейв не знайдено"; return; }
 
         IsBusy = true; ProgressVisible = true; Progress = 0;
@@ -283,16 +313,26 @@ public class MainViewModel : ViewModelBase
         StatusText = "Download з сервера...";
         try
         {
-            // Ніколи не перезаписуємо — унікальне ім'я з timestamp
+            // uniqueName: false — перезаписуємо: ім'я = session_name.sav (canonical)
             var path = await _api.DownloadSaveAsync(SelectedWorld!.Id, dir,
                 new Progress<double>(p => Progress = p * 100),
-                uniqueName: true);
-            StatusText = path != null ? $"Скачано ✓ → {System.IO.Path.GetFileName(path)}" : "Помилка download";
-            RefreshLocalInfo();
-            UpdateSyncDirection();
+                uniqueName: false);
+            if (path != null)
+            {
+                StatusText = $"Скачано ✓ → {System.IO.Path.GetFileName(path)}";
+                _lastDownloadedPath = path;
+            }
+            else
+            {
+                StatusText = "Помилка download";
+            }
+            // Оновлюємо CloudMeta і local одночасно щоб порівняння було актуальним
+            await LoadWorldMetaAsync();
         }
         finally { IsBusy = false; ProgressVisible = false; }
     }
+
+    private string? _lastDownloadedPath;
 
     private void Logout()
     {
@@ -308,17 +348,29 @@ public class MainViewModel : ViewModelBase
             Process.Start("explorer.exe", dir);
     }
 
-    // Шукає найкращий сейв для цього світу:
-    // 1. Звичайний .sav з назвою світу
-    // 2. Autosave з назвою світу
-    // 3. Будь-який звичайний .sav
-    // 4. Будь-який autosave
-    private static FileInfo? FindBestLocalSave(string? worldName)
+    // Шукає найкращий сейв для цього світу.
+    // Пріоритет: точний match по sessionName (canonical) → match по worldName → будь-який звичайний
+    private static FileInfo? FindBestLocalSave(string? worldName, string? sessionName = null)
     {
         var all = GetAllSaveFiles();
         if (all.Count == 0) return null;
 
         bool IsAuto(FileInfo f) => f.Name.Contains("autosave", StringComparison.OrdinalIgnoreCase);
+
+        // 1. Точний match по canonical session name (session_name.sav)
+        if (!string.IsNullOrEmpty(sessionName))
+        {
+            var exact = all.FirstOrDefault(f =>
+                string.Equals(Path.GetFileNameWithoutExtension(f.Name), sessionName, StringComparison.OrdinalIgnoreCase));
+            if (exact != null) return exact;
+
+            // Partial match по sessionName (якщо autosave або з суфіксом)
+            var partial = all.Where(f => !IsAuto(f) &&
+                f.Name.Contains(sessionName, StringComparison.OrdinalIgnoreCase)).MaxBy(f => f.LastWriteTime);
+            if (partial != null) return partial;
+        }
+
+        // 2. Match по worldName
         bool MatchesWorld(FileInfo f) => !string.IsNullOrEmpty(worldName) &&
             f.Name.Contains(worldName, StringComparison.OrdinalIgnoreCase);
 
@@ -349,6 +401,15 @@ public class MainViewModel : ViewModelBase
 
     private static List<FileInfo> GetAllSaveFiles()
     {
+        // Custom folder: scan directly (flat), no subdirectory requirement
+        var custom = AuthService.LoadCustomSaveFolder();
+        if (!string.IsNullOrEmpty(custom) && Directory.Exists(custom))
+        {
+            return Directory.EnumerateFiles(custom, "*.sav", SearchOption.AllDirectories)
+                .Select(f => new FileInfo(f))
+                .ToList();
+        }
+
         var root = GetSaveGamesRoot();
         if (root == null) return [];
 

@@ -1,11 +1,32 @@
-name: Build Windows App
+name: Build & Test
 
 on:
   push:
+    branches: [ main, dev ]
     tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, dev ]
 
 jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore
+      run: dotnet restore SFTracker.Tests/SFTracker.Tests.csproj
+
+    - name: Test
+      run: dotnet test SFTracker.Tests/SFTracker.Tests.csproj --no-restore --logger "console;verbosity=normal"
+
   build:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
     permissions:
       contents: write
@@ -18,7 +39,6 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Bump version in .csproj
-      if: startsWith(github.ref, 'refs/tags/')
       run: |
         $tag = "${{ github.ref_name }}" -replace '^v', ''
         $csproj = "SFTracker/SFTracker.csproj"
@@ -45,7 +65,6 @@ jobs:
         path: dist/SFT-Tracker-Setup.exe
 
     - name: Release
-      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         files: dist/SFT-Tracker-Setup.exe
@@ -53,7 +72,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Notify Backend
-      if: startsWith(github.ref, 'refs/tags/')
       run: |
         $ver = "${{ github.ref_name }}" -replace '^v', ''
         $body = @{

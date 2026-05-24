@@ -16,22 +16,33 @@
         <!-- Header -->
         <Border Grid.Row="0" Style="{StaticResource GlassCard}" Margin="0,0,0,8">
             <Grid>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="SF Tracker" FontSize="15" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimaryBrush}"/>
-                    <Border Background="{StaticResource AccentBrush}" CornerRadius="4"
-                            Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center"
-                            Visibility="{Binding IsPremium, Converter={StaticResource BoolToVisibility}}">
-                        <TextBlock Text="PRO" FontSize="9" FontWeight="Bold" Foreground="White"/>
-                    </Border>
-                    <TextBlock Text="{Binding StorageInfo}" FontSize="11"
-                               Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0"
-                               VerticalAlignment="Center"
-                               Visibility="{Binding StorageInfo, Converter={StaticResource NotEmptyToVisibility}}"/>
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="SF Tracker" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <Border Background="{StaticResource AccentBrush}" CornerRadius="4"
+                                Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding IsPremium, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="PRO" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0"
+                                Visibility="{Binding Username, Converter={StaticResource NotEmptyToVisibility}}">
+                        <TextBlock Text="{Binding Username}" FontSize="11"
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text=" · " FontSize="11"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Visibility="{Binding StorageInfo, Converter={StaticResource NotEmptyToVisibility}}"/>
+                        <TextBlock Text="{Binding StorageInfo}" FontSize="11"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Visibility="{Binding StorageInfo, Converter={StaticResource NotEmptyToVisibility}}"/>
+                    </StackPanel>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button Style="{StaticResource IconButton}" Command="{Binding OpenSaveFolderCommand}"
                             ToolTip="Відкрити папку сейвів">📁</Button>
+                    <Button Style="{StaticResource IconButton}" Click="Settings_Click"
+                            ToolTip="Налаштування" Margin="4,0,0,0">⚙️</Button>
                     <Button Style="{StaticResource IconButton}" Command="{Binding RefreshCommand}"
                             ToolTip="Оновити" Margin="4,0,0,0">↺</Button>
                     <Button Style="{StaticResource IconButton}" Command="{Binding LogoutCommand}"
@@ -60,26 +71,51 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
+                <!-- LOCAL -->
                 <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <Ellipse Width="6" Height="6" Fill="#44FF6B35" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="ЛОКАЛЬНО" FontSize="10" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                     </StackPanel>
-                    <TextBlock Text="{Binding LocalSaveInfo}" Foreground="{StaticResource TextPrimaryBrush}"
-                               FontSize="12" TextWrapping="Wrap" LineHeight="18"/>
+
+                    <!-- Play time — головне -->
+                    <TextBlock Text="{Binding LocalPlayTime}" FontSize="20" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                    <!-- Дата -->
+                    <TextBlock Text="{Binding LocalSaveDate}" FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,2"/>
+                    <!-- Назва файлу дрібно -->
+                    <TextBlock Text="{Binding LocalFileName}" FontSize="10"
+                               Foreground="#555570" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding LocalExists, Converter={StaticResource BoolToVisibility}}"/>
+                    <TextBlock Text="Немає сейву" FontSize="12" FontStyle="Italic"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Visibility="{Binding LocalExists, Converter={StaticResource BoolToVisibility},
+                                            ConverterParameter=invert}"/>
                 </StackPanel>
 
                 <Rectangle Grid.Column="1" Fill="#22FFFFFF" Width="1"/>
 
+                <!-- CLOUD -->
                 <StackPanel Grid.Column="2" Margin="12,0,0,0">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <Ellipse Width="6" Height="6" Fill="#4400BFFF" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="ХМАРА" FontSize="10" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                     </StackPanel>
-                    <TextBlock Text="{Binding CloudSaveInfo}" Foreground="{StaticResource TextPrimaryBrush}"
-                               FontSize="12" TextWrapping="Wrap" LineHeight="18"/>
+
+                    <TextBlock Text="{Binding CloudPlayTime}" FontSize="20" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                    <TextBlock Text="{Binding CloudSaveDate}" FontSize="11"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,2"/>
+                    <TextBlock Text="{Binding CloudFileName}" FontSize="10"
+                               Foreground="#555570" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding CloudExists, Converter={StaticResource BoolToVisibility}}"/>
+                    <TextBlock Text="Порожньо" FontSize="12" FontStyle="Italic"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Visibility="{Binding CloudExists, Converter={StaticResource BoolToVisibility},
+                                            ConverterParameter=invert}"/>
                 </StackPanel>
             </Grid>
         </Border>

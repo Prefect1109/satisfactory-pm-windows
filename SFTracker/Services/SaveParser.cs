@@ -37,6 +37,14 @@ public static class SaveParser
         catch { return 0; }
     }
 
+    public static string FormatPlayTime(int sec)
+    {
+        if (sec <= 0) return "—";
+        var h = sec / 3600;
+        var m = (sec % 3600) / 60;
+        return h > 0 ? $"{h}г {m}хв" : $"{m}хв";
+    }
+
     // FString: positive length = UTF-8 (includes null), negative = UTF-16LE (abs chars, includes null)
     private static void SkipFString(BinaryReader br)
     {

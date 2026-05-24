@@ -66,4 +66,44 @@ public static class AuthService
         Directory.CreateDirectory(Path.GetDirectoryName(SkipConfirmPath)!);
         File.WriteAllText(SkipConfirmPath, skip ? "1" : "0");
     }
+
+    private static readonly string AppDataDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SFTracker");
+
+    private static readonly string AutoSyncPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SFTracker", "auto_sync.txt");
+
+    private static readonly string CustomSavePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SFTracker", "custom_save_path.txt");
+
+    public static bool LoadAutoSync()
+    {
+        try { return !File.Exists(AutoSyncPath) || File.ReadAllText(AutoSyncPath).Trim() == "1"; }
+        catch { return true; }
+    }
+
+    public static void SaveAutoSync(bool enabled)
+    {
+        Directory.CreateDirectory(AppDataDir);
+        File.WriteAllText(AutoSyncPath, enabled ? "1" : "0");
+    }
+
+    public static string? LoadCustomSaveFolder()
+    {
+        try
+        {
+            if (!File.Exists(CustomSavePath)) return null;
+            var p = File.ReadAllText(CustomSavePath).Trim();
+            return string.IsNullOrEmpty(p) ? null : p;
+        }
+        catch { return null; }
+    }
+
+    public static void SaveCustomSaveFolder(string? path)
+    {
+        Directory.CreateDirectory(AppDataDir);
+        File.WriteAllText(CustomSavePath, path ?? "");
+    }
 }

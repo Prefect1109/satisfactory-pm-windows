@@ -3,8 +3,11 @@ using System.IO;
 using System.Net.Http;
 using System.Reflection;
 using System.Windows;
+using SFTracker.Models;
 
 namespace SFTracker.Services;
+
+public enum UpdateMode { None, Optional, Force }
 
 public static class UpdateService
 {
@@ -14,6 +17,14 @@ public static class UpdateService
     public static bool IsNewer(string remoteVersion)
     {
         return Version.TryParse(remoteVersion, out var remote) && remote > CurrentVersion;
+    }
+
+    public static UpdateMode GetUpdateMode(VersionInfo? info, Version? current = null)
+    {
+        if (info == null) return UpdateMode.None;
+        var cur = current ?? CurrentVersion;
+        if (!Version.TryParse(info.Version, out var remote) || remote <= cur) return UpdateMode.None;
+        return info.ForceUpdate ? UpdateMode.Force : UpdateMode.Optional;
     }
 
     public static async Task<bool> DownloadUpdateAsync(string url, IProgress<double>? progress = null)

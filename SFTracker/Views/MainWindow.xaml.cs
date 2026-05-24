@@ -44,7 +44,7 @@ public partial class MainWindow : Window
     {
         var vm = new MainViewModel(_api);
         vm.LoggedOut += NavigateToLogin;
-        var page = new MainPage(vm);
+        var page = new MainPage(vm, _api);
         ContentFrame.Navigate(page);
         _ = vm.LoadAsync();
     }
@@ -55,17 +55,17 @@ public partial class MainWindow : Window
         {
             var api = new ApiService();
             var info = await api.GetVersionAsync();
-            if (info == null || !UpdateService.IsNewer(info.Version)) return;
+            var mode = UpdateService.GetUpdateMode(info);
 
-            if (info.ForceUpdate)
+            if (mode == UpdateMode.Force)
             {
-                await ForceUpdateAsync(info);
+                await ForceUpdateAsync(info!);
             }
-            else
+            else if (mode == UpdateMode.Optional)
             {
                 var current = Assembly.GetExecutingAssembly().GetName().Version!;
                 var result = MessageBox.Show(
-                    $"Доступне оновлення {info.Version}\n(поточна {current.Major}.{current.Minor}.{current.Build})\n\nВстановити зараз?",
+                    $"Доступне оновлення {info!.Version}\n(поточна {current.Major}.{current.Minor}.{current.Build})\n\nВстановити зараз?",
                     "Оновлення",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Information);

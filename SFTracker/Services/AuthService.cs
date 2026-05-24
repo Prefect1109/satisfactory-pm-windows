@@ -34,21 +34,21 @@ public static class AuthService
         try { File.Delete(TokenPath); } catch { }
     }
 
-    public static int? LoadLastWorld()
+    public static string? LoadLastWorld()
     {
         try
         {
             if (!File.Exists(LastWorldPath)) return null;
             var s = File.ReadAllText(LastWorldPath).Trim();
-            return int.TryParse(s, out var id) ? id : null;
+            return string.IsNullOrEmpty(s) ? null : s;
         }
         catch { return null; }
     }
 
-    public static void SaveLastWorld(int worldId)
+    public static void SaveLastWorld(string inviteCode)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(LastWorldPath)!);
-        File.WriteAllText(LastWorldPath, worldId.ToString());
+        File.WriteAllText(LastWorldPath, inviteCode);
     }
 
     private static readonly string SkipConfirmPath = Path.Combine(

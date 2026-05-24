@@ -16,6 +16,7 @@ public class MainViewModel : ViewModelBase
     {
         _api = api;
         _skipConfirm = AuthService.LoadSkipConfirm();
+        _autoSync = AuthService.LoadAutoSync();
         SyncCommand     = new RelayCommand(async _ => await SyncAsync(),     _ => SelectedWorld != null && !IsBusy);
         UploadCommand   = new RelayCommand(async _ => await ConfirmAndUploadAsync(), _ => SelectedWorld != null && !IsBusy);
         DownloadCommand = new RelayCommand(async _ => await ConfirmAndDownloadAsync(), _ => SelectedWorld != null && !IsBusy);
@@ -35,6 +36,13 @@ public class MainViewModel : ViewModelBase
     {
         get => _skipConfirm;
         set { Set(ref _skipConfirm, value); AuthService.SaveSkipConfirm(value); }
+    }
+
+    private bool _autoSync;
+    public bool AutoSync
+    {
+        get => _autoSync;
+        set { Set(ref _autoSync, value); AuthService.SaveAutoSync(value); }
     }
 
     private string _storageInfo = "";
@@ -65,7 +73,7 @@ public class MainViewModel : ViewModelBase
         {
             if (Set(ref _selectedWorld, value))
             {
-                if (value != null) AuthService.SaveLastWorld(value.Id);
+                if (value != null) AuthService.SaveLastWorld(value.InviteCode);
                 _ = LoadWorldMetaAsync();
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -134,11 +142,11 @@ public class MainViewModel : ViewModelBase
             Worlds.Clear();
             foreach (var w in worlds) Worlds.Add(w);
 
-            var lastId = AuthService.LoadLastWorld();
-            SelectedWorld = Worlds.FirstOrDefault(w => w.Id == lastId) ?? Worlds.FirstOrDefault();
+            var lastCode = AuthService.LoadLastWorld();
+            SelectedWorld = Worlds.FirstOrDefault(w => w.InviteCode == lastCode) ?? Worlds.FirstOrDefault();
             StatusText = "";
 
-            if (AuthService.LoadAutoSync() && SelectedWorld != null)
+            if (AutoSync && SelectedWorld != null)
                 await SyncAsync();
         }
         finally { IsBusy = false; }
@@ -147,7 +155,7 @@ public class MainViewModel : ViewModelBase
     private async Task LoadWorldMetaAsync()
     {
         if (SelectedWorld == null) return;
-        CloudMeta = await _api.GetSaveMetadataAsync(SelectedWorld.Id);
+        CloudMeta = await _api.GetSaveMetadataAsync(SelectedWorld.InviteCode);
         RefreshLocalInfo();
         UpdateCloudInfo();
     }
@@ -296,7 +304,7 @@ public class MainViewModel : ViewModelBase
         StatusText = $"Upload: {f.Name}...";
         try
         {
-            var ok = await _api.UploadSaveAsync(SelectedWorld!.Id, f.FullName,
+            var ok = await _api.UploadSaveAsync(SelectedWorld!.InviteCode, f.FullName,
                 new Progress<double>(p => Progress = p * 100));
             StatusText = ok ? "Завантажено на сервер ✓" : "Помилка upload";
             if (ok) await LoadWorldMetaAsync();
@@ -314,7 +322,7 @@ public class MainViewModel : ViewModelBase
         try
         {
             // uniqueName: false — перезаписуємо: ім'я = session_name.sav (canonical)
-            var path = await _api.DownloadSaveAsync(SelectedWorld!.Id, dir,
+            var path = await _api.DownloadSaveAsync(SelectedWorld!.InviteCode, dir,
                 new Progress<double>(p => Progress = p * 100),
                 uniqueName: false);
             if (path != null)

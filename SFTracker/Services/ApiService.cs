@@ -52,27 +52,27 @@ public class ApiService
         catch { return []; }
     }
 
-    public async Task<SaveMetadata?> GetSaveMetadataAsync(int worldId)
+    public async Task<SaveMetadata?> GetSaveMetadataAsync(string inviteCode)
     {
         try
         {
-            var resp = await _http.GetAsync($"{BaseUrl}/worlds/{worldId}/save/metadata");
+            var resp = await _http.GetAsync($"{BaseUrl}/worlds/{inviteCode}/save/metadata");
             if (!resp.IsSuccessStatusCode) return null;
             return await resp.Content.ReadFromJsonAsync<SaveMetadata>();
         }
         catch { return null; }
     }
 
-    public async Task<string?> DownloadSaveAsync(int worldId, string targetDir, IProgress<double>? progress = null, bool uniqueName = false)
+    public async Task<string?> DownloadSaveAsync(string inviteCode, string targetDir, IProgress<double>? progress = null, bool uniqueName = false)
     {
         try
         {
-            var resp = await _http.GetAsync($"{BaseUrl}/worlds/{worldId}/save/latest",
+            var resp = await _http.GetAsync($"{BaseUrl}/worlds/{inviteCode}/save/latest",
                 HttpCompletionOption.ResponseHeadersRead);
             if (!resp.IsSuccessStatusCode) return null;
 
             var cd = resp.Content.Headers.ContentDisposition?.FileName?.Trim('"');
-            var baseName = string.IsNullOrEmpty(cd) ? $"world_{worldId}.sav" : cd;
+            var baseName = string.IsNullOrEmpty(cd) ? $"world_{inviteCode}.sav" : cd;
 
             // Ніколи не перезаписуємо — додаємо timestamp якщо файл вже є
             string fullPath;
@@ -105,7 +105,7 @@ public class ApiService
         catch { return null; }
     }
 
-    public async Task<bool> UploadSaveAsync(int worldId, string filePath, IProgress<double>? progress = null)
+    public async Task<bool> UploadSaveAsync(string inviteCode, string filePath, IProgress<double>? progress = null)
     {
         try
         {
@@ -114,7 +114,7 @@ public class ApiService
             using var streamContent = new StreamContent(fileStream);
             content.Add(streamContent, "file", Path.GetFileName(filePath));
 
-            var resp = await _http.PostAsync($"{BaseUrl}/worlds/{worldId}/save", content);
+            var resp = await _http.PostAsync($"{BaseUrl}/worlds/{inviteCode}/save", content);
             return resp.IsSuccessStatusCode;
         }
         catch { return false; }

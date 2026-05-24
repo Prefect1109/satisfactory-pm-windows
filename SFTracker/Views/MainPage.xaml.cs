@@ -18,11 +18,10 @@ public partial class MainPage : Page
         _api = api;
     }
 
-    private void Settings_Click(object sender, RoutedEventArgs e)
-    {
-        var win = new SettingsWindow(_api) { Owner = Window.GetWindow(this) };
-        win.ShowDialog();
-        // Перезавантажуємо якщо змінилась папка сейвів
-        _ = _vm.LoadAsync();
-    }
+    // private void Settings_Click(object sender, RoutedEventArgs e)
+    // {
+    //     var win = new SettingsWindow(_api) { Owner = Window.GetWindow(this) };
+    //     win.ShowDialog();
+    //     _ = _vm.LoadAsync();
+    // }
 }

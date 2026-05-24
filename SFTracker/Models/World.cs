@@ -4,20 +4,11 @@ namespace SFTracker.Models;
 
 public class World
 {
-    [JsonPropertyName("id")]
-    public int Id { get; set; }
+    [JsonPropertyName("invite_code")]
+    public string InviteCode { get; set; } = "";
 
     [JsonPropertyName("name")]
     public string Name { get; set; } = "";
-
-    [JsonPropertyName("owner_id")]
-    public int OwnerId { get; set; }
-
-    [JsonPropertyName("owner_name")]
-    public string? OwnerName { get; set; }
-
-    [JsonPropertyName("member_count")]
-    public int MemberCount { get; set; }
 
     public override string ToString() => Name;
 }

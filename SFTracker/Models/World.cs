@@ -54,15 +54,3 @@ public class UserInfo
     [JsonPropertyName("storage_limit")]
     public long StorageLimit { get; set; }
 }
-
-public class VersionInfo
-{
-    [JsonPropertyName("version")]
-    public string Version { get; set; } = "";
-
-    [JsonPropertyName("url")]
-    public string Url { get; set; } = "";
-
-    [JsonPropertyName("force_update")]
-    public bool ForceUpdate { get; set; }
-}

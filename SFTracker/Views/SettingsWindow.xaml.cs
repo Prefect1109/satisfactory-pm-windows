@@ -58,24 +58,10 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
+    private void CheckUpdate_Click(object sender, RoutedEventArgs e)
     {
-        CheckUpdateBtn.IsEnabled = false;
-        CheckUpdateBtn.Content = "...";
-        try
-        {
-            var info = await _api.GetVersionAsync();
-            var mode = UpdateService.GetUpdateMode(info);
-            if (mode == UpdateMode.None)
-                MessageBox.Show("У вас актуальна версія.", "Оновлення", MessageBoxButton.OK, MessageBoxImage.Information);
-            else
-                MessageBox.Show($"Доступна нова версія: {info!.Version}\nЗакрийте налаштування і перезапустіть застосунок.", "Оновлення", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        finally
-        {
-            CheckUpdateBtn.IsEnabled = true;
-            CheckUpdateBtn.Content = "Перевірити";
-        }
+        MessageBox.Show("Оновлення керується Microsoft Store.", "Оновлення",
+            MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void Support_Click(object sender, RoutedEventArgs e)

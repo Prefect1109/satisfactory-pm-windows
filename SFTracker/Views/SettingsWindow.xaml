@@ -1,7 +1,7 @@
 <Window x:Class="SFTracker.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Налаштування" Height="340" Width="420"
+        Title="Налаштування" Height="380" Width="420"
         ResizeMode="NoResize"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -30,7 +30,9 @@
                     <TextBlock Text="СИНХРОНІЗАЦІЯ" FontSize="10" FontWeight="SemiBold"
                                Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10"/>
                     <CheckBox x:Name="AutoSyncCheck" Foreground="{StaticResource TextPrimaryBrush}"
-                              FontSize="13">Auto-Sync при запуску</CheckBox>
+                              FontSize="13" Margin="0,0,0,8">Auto-Sync при запуску</CheckBox>
+                    <CheckBox x:Name="RunInBackgroundCheck" Foreground="{StaticResource TextPrimaryBrush}"
+                              FontSize="13">Працювати в фоні (закрити → system tray)</CheckBox>
                 </StackPanel>
             </Border>
 

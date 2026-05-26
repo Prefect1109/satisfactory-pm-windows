@@ -10,15 +10,57 @@ namespace SFTracker.Views;
 public partial class MainWindow : Window
 {
     private readonly ApiService _api = new();
+    private System.Windows.Forms.NotifyIcon? _trayIcon;
+    private bool _forceClose;
 
     public MainWindow()
     {
         InitializeComponent();
         Loaded += OnLoaded;
+        Closed += (_, _) => _trayIcon?.Dispose();
+    }
+
+    private void InitTrayIcon()
+    {
+        _trayIcon = new System.Windows.Forms.NotifyIcon
+        {
+            Text = "SF Tracker",
+            Icon = new System.Drawing.Icon(
+                System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "icon.ico")),
+            Visible = false,
+        };
+
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add("Відкрити", null, (_, _) => ShowWindow());
+        menu.Items.Add("Вийти", null, (_, _) => { _forceClose = true; Close(); });
+        _trayIcon.ContextMenuStrip = menu;
+        _trayIcon.DoubleClick += (_, _) => ShowWindow();
+    }
+
+    private void ShowWindow()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+        _trayIcon!.Visible = false;
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if (!_forceClose && AuthService.LoadRunInBackground())
+        {
+            e.Cancel = true;
+            Hide();
+            _trayIcon!.Visible = true;
+            _trayIcon.ShowBalloonTip(1500, "SF Tracker", "Працює у фоні", System.Windows.Forms.ToolTipIcon.None);
+            return;
+        }
+        base.OnClosing(e);
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        InitTrayIcon();
         await CheckForUpdateAsync();
 
         var token = AuthService.LoadToken();
@@ -43,7 +85,7 @@ public partial class MainWindow : Window
     private void NavigateToMain()
     {
         var vm = new MainViewModel(_api);
-        vm.LoggedOut += NavigateToLogin;
+        vm.LoggedOut += () => { _forceClose = false; NavigateToLogin(); };
         var page = new MainPage(vm, _api);
         ContentFrame.Navigate(page);
         _ = vm.LoadAsync();

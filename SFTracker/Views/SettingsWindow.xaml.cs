@@ -21,6 +21,7 @@ public partial class SettingsWindow : Window
     private void LoadSettings()
     {
         AutoSyncCheck.IsChecked = AuthService.LoadAutoSync();
+        RunInBackgroundCheck.IsChecked = AuthService.LoadRunInBackground();
 
         var customPath = AuthService.LoadCustomSaveFolder();
         SavePathBox.Text = customPath ?? "";
@@ -35,6 +36,7 @@ public partial class SettingsWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         AuthService.SaveAutoSync(AutoSyncCheck.IsChecked == true);
+        AuthService.SaveRunInBackground(RunInBackgroundCheck.IsChecked == true);
         var path = SavePathBox.Text.Trim();
         AuthService.SaveCustomSaveFolder(string.IsNullOrEmpty(path) ? null : path);
         Close();

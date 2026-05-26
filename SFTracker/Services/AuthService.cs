@@ -106,4 +106,18 @@ public static class AuthService
         Directory.CreateDirectory(AppDataDir);
         File.WriteAllText(CustomSavePath, path ?? "");
     }
+
+    private static readonly string RunInBackgroundPath = Path.Combine(AppDataDir, "run_in_background.txt");
+
+    public static bool LoadRunInBackground()
+    {
+        try { return File.Exists(RunInBackgroundPath) && File.ReadAllText(RunInBackgroundPath).Trim() == "1"; }
+        catch { return false; }
+    }
+
+    public static void SaveRunInBackground(bool enabled)
+    {
+        Directory.CreateDirectory(AppDataDir);
+        File.WriteAllText(RunInBackgroundPath, enabled ? "1" : "0");
+    }
 }

@@ -329,6 +329,15 @@ public class MainViewModel : ViewModelBase
             {
                 StatusText = $"Скачано ✓ → {System.IO.Path.GetFileName(path)}";
                 _lastDownloadedPath = path;
+
+                // Виставляємо timestamp файлу = cloud.UpdatedAt щоб fallback-порівняння по даті
+                // не вважало щойно скачаний файл новішим за хмарний
+                if (CloudMeta?.UpdatedAt != null &&
+                    DateTime.TryParse(CloudMeta.UpdatedAt, null,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var cloudDate))
+                {
+                    File.SetLastWriteTime(path, cloudDate.ToLocalTime());
+                }
             }
             else
             {

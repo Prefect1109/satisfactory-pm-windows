@@ -57,28 +57,6 @@ jobs:
     - name: Rename output
       run: Move-Item dist/SFTracker.exe dist/SFT-Tracker-Setup.exe
 
-    - name: Upload unsigned artifact
-      id: upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: SFT-Tracker-Setup-unsigned
-        path: dist/SFT-Tracker-Setup.exe
-
-    - name: Sign with SignPath
-      uses: signpath/github-action-submit-signing-request@v1
-      with:
-        api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-        organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
-        project-slug: sft-tracker
-        signing-policy-slug: release-signing
-        artifact-configuration-slug: exe
-        github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
-        wait-for-completion: true
-        output-artifact-directory: dist/signed
-
-    - name: Replace with signed artifact
-      run: Move-Item dist/signed/SFT-Tracker-Setup.exe dist/SFT-Tracker-Setup.exe -Force
-
     - name: Release
       uses: softprops/action-gh-release@v2
       with:

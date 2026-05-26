@@ -2,9 +2,7 @@ name: Test
 
 on:
   push:
-    branches: [ main, dev ]
-  pull_request:
-    branches: [ main, dev ]
+    tags: [ 'v*' ]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

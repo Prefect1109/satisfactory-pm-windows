@@ -54,41 +54,48 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true `
           -o dist
 
-    - name: Prepare MSIX layout
-      run: |
-        $ver = ("${{ github.ref_name }}" -replace '^v', '') + ".0"
-        # Patch version and publisher CN in manifest
-        (Get-Content SFTracker/Package.appxmanifest) `
-          -replace 'Version="1\.0\.0\.0"', "Version=`"$ver`"" `
-          -replace 'CN=PUBLISHER_CN_PLACEHOLDER', "CN=${{ secrets.PUBLISHER_CN }}" `
-          | Set-Content dist/AppxManifest.xml
-        # Copy assets
-        New-Item -ItemType Directory -Path dist/Assets -Force | Out-Null
-        Copy-Item assets/msix/Square44x44Logo.png   dist/Assets/
-        Copy-Item assets/msix/Square150x150Logo.png dist/Assets/
-        Copy-Item assets/msix/StoreLogo.png         dist/Assets/
-        Copy-Item assets/msix/Wide310x150Logo.png   dist/Assets/
-        Copy-Item assets/msix/SplashScreen.png      dist/Assets/
+    - name: Rename output
+      run: Move-Item dist/SFTracker.exe dist/SFT-Tracker-Setup.exe
 
-    - name: Create MSIX
-      run: |
-        $sdk = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
-          Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } |
-          Sort-Object { [Version]$_.Name } -Descending |
-          Select-Object -First 1
-        $makeappx = Join-Path $sdk.FullName "x64\makeappx.exe"
-        & $makeappx pack /d dist/ /p SFT-Tracker.msix /nv
-        Write-Host "Created SFT-Tracker.msix"
-
-    - name: Upload Artifact
+    - name: Upload unsigned artifact
+      id: upload
       uses: actions/upload-artifact@v4
       with:
-        name: SFT-Tracker-MSIX
-        path: SFT-Tracker.msix
+        name: SFT-Tracker-Setup-unsigned
+        path: dist/SFT-Tracker-Setup.exe
+
+    - name: Sign with SignPath
+      uses: signpath/github-action-submit-signing-request@v1
+      with:
+        api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+        organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
+        project-slug: sft-tracker
+        signing-policy-slug: release-signing
+        artifact-configuration-slug: exe
+        github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+        wait-for-completion: true
+        output-artifact-directory: dist/signed
+
+    - name: Replace with signed artifact
+      run: Move-Item dist/signed/SFT-Tracker-Setup.exe dist/SFT-Tracker-Setup.exe -Force
 
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
-        files: SFT-Tracker.msix
+        files: dist/SFT-Tracker-Setup.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Notify Backend
+      run: |
+        $ver = "${{ github.ref_name }}" -replace '^v', ''
+        $body = @{
+          version = $ver
+          url = "https://github.com/Prefect1109/satisfactory-pm-windows/releases/download/${{ github.ref_name }}/SFT-Tracker-Setup.exe"
+          force_update = $false
+        } | ConvertTo-Json
+        Invoke-RestMethod -Uri "https://satisfactory.kaffka.tech/api/admin/client/version" `
+          -Method POST `
+          -ContentType "application/json" `
+          -Headers @{ "x-admin-token" = "${{ secrets.ADMIN_TOKEN }}" } `
+          -Body $body

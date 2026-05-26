@@ -119,4 +119,16 @@ public class ApiService
         }
         catch { return false; }
     }
+
+    public async Task<VersionInfo?> GetVersionAsync()
+    {
+        try
+        {
+            using var http = new HttpClient();
+            var resp = await http.GetAsync($"{BaseUrl}/client/version");
+            if (!resp.IsSuccessStatusCode) return null;
+            return await resp.Content.ReadFromJsonAsync<VersionInfo>();
+        }
+        catch { return null; }
+    }
 }
